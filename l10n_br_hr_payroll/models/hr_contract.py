@@ -262,8 +262,11 @@ class HrContract(models.Model):
     )
 
     indicativo_de_admissao = fields.Selection(
-        selection=[('transferencia', u'Trasferência'),
-                   ('normal', u'Normal')],
+        selection=[
+            ('1', u'Normal'),
+            ('2', u'Decorrente de Ação Fiscal'),
+            ('3', u'Decorrente de Decisão Judicial'),
+        ],
         string="Indicativo da admissão"
     )
 
