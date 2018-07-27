@@ -154,7 +154,16 @@ class HrContract(models.Model):
             # para casos como funcionario cedente, utilizar a data de
             # admissao no orgao cedente
             if self.data_admissao_cedente:
-                inicio = fields.Date.from_string(self.data_admissao_cedente)
+                # Iniciar a contagem a partir do segundo dia  do ano
+                # anterior a data de contratação do funcionario
+                data_admissao = fields.Date.from_string(self.date_start)
+                ano_admissao = data_admissao.year
+                inicio = data_admissao.replace(
+                    day=2, month=1, year=ano_admissao-1)
+
+            if self.forca_inicio_periodo_aquisitivo:
+                inicio = fields.Date.from_string(
+                    self.forca_inicio_periodo_aquisitivo)
 
             hoje = fields.Date.from_string(data_referencia)
 
