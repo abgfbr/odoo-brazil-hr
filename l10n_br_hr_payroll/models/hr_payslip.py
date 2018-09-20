@@ -730,57 +730,6 @@ class HrPayslip(models.Model):
             # GET dias Base para cálculo do mês
             #
 
-            if self.tipo_de_folha == 'rescisao':
-                # Na rescisao não utilizar mês comercial e sim o total de dias
-                # trabalhados no mês
-                dias_mes = resource_calendar_obj.get_dias_base(
-                    fields.Datetime.from_string(date_from),
-                    fields.Datetime.from_string(date_to),
-                    mes_comercial=False
-                )
-
-                # Quando o afastamento for no primeiro dia do mes,
-                # significa que nao trabalhou nenhum dia
-                primeiro_dia_do_mes = \
-                    str(datetime.strptime(
-                        str(self.mes_do_ano) + '-' + str(self.ano), '%m-%Y'))
-                if self.data_afastamento == primeiro_dia_do_mes[:10]:
-                    dias_mes = 0
-
-                # Ajuste temporário!
-                # Se na rescisao ja tiver sido calculado o holerite do mes:
-                # Holerite março gerado em 17/mar referente a 1/mar ate 30/mar
-                # rescisao feita no dia 30/mar
-                # Zerar os dias do mes pois ja foram pagos no holerite
-                # Quando rescisao o metodo set_dates da payslip, encarega de
-                #  igualar o dat_from e date_to do holerite à data de afastam.
-                if self.data_afastamento == self.date_to and \
-                        self.data_afastamento == self.date_to:
-                    dias_mes = 0
-
-            # Quando for admissao levar em consideração apenas os dias
-            # trabalhados e não o mês comercial. Assim se for admitido no
-            # dia 20 em um mês de 31 dias, retornar 11 dias trabalhados no
-            # mês de admissão.
-            elif date_from == contract_id.date_start:
-                dias_mes = resource_calendar_obj.get_dias_base(
-                    fields.Datetime.from_string(date_from),
-                    fields.Datetime.from_string(date_to),
-                    mes_comercial=False
-                )
-
-            # Para todos ou outros casos utilizar mês comercial,
-            # contabilizando mês cheio com 30 dias
-            else:
-                dias_mes = resource_calendar_obj.get_dias_base(
-                    fields.Datetime.from_string(date_from),
-                    fields.Datetime.from_string(date_to),
-                    mes_comercial=True
-                )
-
-            result += [self.get_attendances(
-                u'Dias Base', 30, u'DIAS_BASE', dias_mes, 0.0, contract_id)]
-
             # get dias uteis
             dias_uteis = self.env['resource.calendar'].quantidade_dias_uteis(
                 fields.Datetime.from_string(date_from),
@@ -875,6 +824,69 @@ class HrPayslip(models.Model):
                         0.0, contract_id
                     )
                 ]
+
+            # Na Rescisao não utilizar mês Proporcional
+            if self.tipo_de_folha == 'rescisao':
+                # Na rescisao não utilizar mês comercial e sim o total de dias
+                # trabalhados no mês
+                dias_mes = resource_calendar_obj.get_dias_base(
+                    fields.Datetime.from_string(date_from),
+                    fields.Datetime.from_string(date_to),
+                    mes_comercial=False
+                )
+
+                # Quando o afastamento for no primeiro dia do mes,
+                # significa que nao trabalhou nenhum dia
+                primeiro_dia_do_mes = \
+                    str(datetime.strptime(
+                        str(self.mes_do_ano) + '-' + str(self.ano), '%m-%Y'))
+                if self.data_afastamento == primeiro_dia_do_mes[:10]:
+                    dias_mes = 0
+
+                # Ajuste temporário!
+                # Se na rescisao ja tiver sido calculado o holerite do mes:
+                # Holerite março gerado em 17/mar referente a 1/mar ate 30/mar
+                # rescisao feita no dia 30/mar
+                # Zerar os dias do mes pois ja foram pagos no holerite
+                # Quando rescisao o metodo set_dates da payslip, encarega de
+                #  igualar o dat_from e date_to do holerite à data de afastam.
+                if self.data_afastamento == self.date_to and \
+                        self.data_afastamento == self.date_to:
+                    dias_mes = 0
+
+            # Na Admissao levar em consideração dias proporcionais trabalhados
+            # e não mês comercial. Assim se for admitido no dia 20 em um mês
+            # de 31 dias, retornar 11 dias trabalhados no mês de admissão.
+            # E se tiver férias no mês, seguir o raciocinio pegando o total de
+            # dias do mes e subtrair dias em férias.
+            elif date_from == contract_id.date_start:
+                dias_mes = resource_calendar_obj.get_dias_base(
+                    fields.Datetime.from_string(date_from),
+                    fields.Datetime.from_string(date_to),
+                    mes_comercial=False
+                )
+
+            # No SAlario do mes se tiver Férias, alem de ser dias
+            # proporcionalizados, levar em conta o dia 31, isto é, se tiver 10
+            # de férias e o mês for de 31 dias, retornar 21 para calculo do
+            # salario do mês.
+            elif quantidade_dias_ferias:
+                dias_mes = resource_calendar_obj.get_dias_base(
+                    fields.Datetime.from_string(date_from),
+                    fields.Datetime.from_string(date_to),
+                    mes_comercial=False, ferias_mes=True
+                )
+
+            # No salario do mês utilizar o salario comercial cheio com 30 dias
+            else:
+                dias_mes = resource_calendar_obj.get_dias_base(
+                    fields.Datetime.from_string(date_from),
+                    fields.Datetime.from_string(date_to),
+                    mes_comercial=True
+                )
+
+            result += [self.get_attendances(
+                u'Dias Base', 30, u'DIAS_BASE', dias_mes, 0.0, contract_id)]
 
             # get Dias Trabalhados
             quantidade_dias_trabalhados = \
