@@ -213,19 +213,26 @@ class ResourceCalendar(models.Model):
             data_referencia += timedelta(days=1)
 
     @api.multi
-    def get_dias_base(self, data_from=datetime.now(), data_to=datetime.now(), mes_comercial=True):
+    def get_dias_base(self, data_from=datetime.now(), data_to=datetime.now(),
+                      mes_comercial=True, ferias_no_mes=False):
         """Calcular a quantidade de dias que devem ser remunerados em
         determinado intervalo de tempo.
         :param datetime data_from: Data inicial do intervalo de tempo.
                datetime data_end: Data final do intervalo
+               boolean mes_comercial : indica se deve levar em consideração
+                                        como mes comercial
+               boolean ferias_no_mes: Indica se teve ou nao féria no mês
         :return int : quantidade de dias que devem ser remunerada
         """
         # Mes comercial sempre será 30 dias
         if mes_comercial:
             return 30 - data_from.day + 1
-        # Na admissao e rescisao nao levar em conta o mes comercial
+
+        # Na admissao, rescisao ou no mes que tiver férias
+        # não levar em conta o mês comercial. Quando tiver férias no mês pode
+        # retornar 31 dias para cálculos.
         quantidade_dias = (data_to - data_from).days + 1
-        if quantidade_dias > 30:
+        if quantidade_dias > 30 and not ferias_no_mes:
             return 30
         else:
             return quantidade_dias
