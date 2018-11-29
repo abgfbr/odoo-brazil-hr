@@ -35,6 +35,12 @@ class HrEmployee(models.Model):
         store=True,
     )
 
+    pensao_id = fields.One2many(
+        string=u'Pensão Alimentícia',
+        comodel_name='hr.employee.pensao',
+        inverse_name='employee_id',
+    )
+
     @api.multi
     @api.depends('contract_ids.gerente_id')
     def _compute_gerente_contrato(self):

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<openerp>
+    <data>
+
+        <record model="ir.ui.view" id="hr_employee_form_view">
+            <field name="name">hr.employee.form (l10n_br_hr_payroll)</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="l10n_br_hr.view_l10n_br_hr_employee_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@string='Documents']" position="after">
+                    <page string="Pensão Alimentícia" groups="base.group_hr_manager,base.group_hr_user">
+                        <field name="pensao_id" widget="one2many_list">
+                            <tree editable="bottom">
+                                <field name="tipo" attrs="{'required': True}"/>
+                                <field name="valor" attrs="{'required': [('tipo', '=', 'fixo')]}"/>
+                                <field name="porcentagem" attrs="{'required': [('tipo', '=', 'porcentagem')]}"/>
+                                <field name="beneficiario_id" attrs="{'required': True}"/>
+                            </tree>
+                        </field>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</openerp>

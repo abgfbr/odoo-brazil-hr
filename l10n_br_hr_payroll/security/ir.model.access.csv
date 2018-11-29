@@ -38,3 +38,5 @@
 "access_hr_job_funcionario","access_model_hr_job_funcionario","hr.model_hr_job","base.group_user",1,0,0,0
 "access_account_move_line_funcionario","access_account_move_line_funcionario","account.model_account_move_line","base.group_user",1,0,0,0
 "access_payment_line_funcionario","access_payment_line_funcionario","account_payment.model_payment_line","base.group_user",1,0,0,0
+"access_hr_employee_pensao_user","access_hr_employee_pensao_user","model_hr_employee_pensao","base.group_hr_user",1,0,0,0
+"access_hr_employee_pensao_manager","access_hr_employee_pensao_manager","model_hr_employee_pensao","base.group_hr_manager",1,1,1,1

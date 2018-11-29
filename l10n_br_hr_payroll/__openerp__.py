@@ -53,6 +53,7 @@
         'views/l10n_br_hr_social_security_tax_view.xml',
         'views/res_config_view.xml',
         'views/hr_telefonia_view.xml',
+        'views/hr_employee_pensao_view.xml',
         # Alterações Contratuais
         'views/l10n_br_hr_contract_change/l10n_br_hr_contract_change_menu.xml',
         'views/l10n_br_hr_contract_change/l10n_br_hr_contract_change_base.xml',

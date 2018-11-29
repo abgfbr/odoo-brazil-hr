@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<openerp>
+    <data>
+
+        <record model="ir.ui.view" id="hr_employee_pensao_form_view">
+            <field name="name">hr.employee.pensao.form (l10n_br_hr_payroll)</field>
+            <field name="model">hr.employee.pensao</field>
+            <field name="arch" type="xml">
+                <form>
+                    <field name="tipo" attrs="{'required': True}"/>
+                    <field name="valor" attrs="{'required': [('tipo', '=', 'fixo')]}"/>
+                    <field name="porcentagem" attrs="{'required': [('tipo', '=', 'porcentagem')]}"/>
+                    <field name="beneficiario_id" attrs="{'required': True}"/>
+                </form>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="hr_employee_pensao_tree_view">
+            <field name="name">hr.employee.pensao.tree</field>
+            <field name="model">hr.employee.pensao</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="tipo"/>
+                    <field name="valor"/>
+                    <field name="porcentagem"/>
+                    <field name="beneficiario_id"/>
+                </tree>
+            </field>
+        </record>
+
+    </data>
+</openerp>
