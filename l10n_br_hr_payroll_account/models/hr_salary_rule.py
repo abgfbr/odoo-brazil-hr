@@ -18,7 +18,14 @@ class HrSalaryRule(models.Model):
         help='Indica se rubrica irá gerar contabilização',
     )
 
-    codigo_contabil = fields.Char(
-        string='Codigo Contábil',
-        help='Código para indicar linha do roteiro Contábil',
+    account_event_template_id = fields.Many2one(
+        string='Roteiro Contábil',
+        comodel_name='account.event.template',
+    )
+
+    account_event_template_line_id = fields.Many2one(
+        string='Linha do Roteiro Contábil',
+        comodel_name='account.event.template.line',
+        domain=
+        "[('account_event_template_id', '=', account_event_template_id)]",
     )

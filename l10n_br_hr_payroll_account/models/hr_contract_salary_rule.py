@@ -11,6 +11,14 @@ class HrContractSalaryRule(models.Model):
 
     _inherit = b'hr.contract.salary.rule'
 
-    codigo_contabil = fields.Char(
-        string='Código de Contabilização',
+    account_event_template_id = fields.Many2one(
+        string='Roteiro Contábil',
+        comodel_name='account.event.template',
+    )
+
+    account_event_template_line_id = fields.Many2one(
+        string='Linha do Roteiro Contábil',
+        comodel_name='account.event.template.line',
+        domain=
+        "[('account_event_template_id', '=', account_event_template_id)]",
     )

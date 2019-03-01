@@ -57,12 +57,13 @@ class L10nBrHrPayslip(models.Model):
             if rule_id in rubricas_especificas:
                 # verificar codigo contabil definido na rubrica especifica
                 codigo_contabil = \
-                    rubricas_especificas.get(rule_id)[0].codigo_contabil
+                    rubricas_especificas.get(rule_id)[0].\
+                        account_event_template_line_id.codigo
 
             # buscar diretamente na configuracao da rubrica
             if not codigo_contabil:
-                codigo_contabil = \
-                    salary_rule_obj.browse(rule_id).codigo_contabil
+                codigo_contabil = salary_rule_obj.browse(rule_id).\
+                    account_event_template_line_id.codigo
 
             # Se nao estiver definido na rubrica utilizar o code da rubrica
             if not codigo_contabil:

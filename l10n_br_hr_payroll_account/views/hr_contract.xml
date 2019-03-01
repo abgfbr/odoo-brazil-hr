@@ -12,7 +12,8 @@
         <field name="inherit_id" ref="l10n_br_hr_payroll.hr_contract_form_view"/>
         <field name="arch" type="xml">
             <field name="specific_quantity" position="before" >
-                <field name="codigo_contabil" />
+                <field name="account_event_template_id" required="1" />
+                <field name="account_event_template_line_id" required="1" />
             </field>
         </field>
     </record>
