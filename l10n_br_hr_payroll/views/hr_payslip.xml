@@ -52,9 +52,6 @@
                     <attribute name="states">verify</attribute>
                     <attribute name="type">object</attribute>
                 </button>
-                <button name="549" position="attributes">
-                    <attribute name="groups">base.group_hr_user</attribute>
-                </button>
 
                 <!-- Adiciona abas -->
                 <xpath expr="//notebook" position="replace">
