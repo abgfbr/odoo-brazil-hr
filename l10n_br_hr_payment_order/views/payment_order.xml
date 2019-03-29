@@ -12,6 +12,9 @@
         <field name="mode">primary</field>
         <field name="inherit_id" ref="l10n_br_financial_payment_order.payment_order_base_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="validar_cnab" attrs="{'invisible':['|', ('cnab_file','=',False), ('tipo_de_folha','!=','normal')]}" type="object" string="Valida CNAB" />
+            </xpath>
             <xpath expr="//form[1]" position="attributes">
                 <attribute name="string">Pagamento da Folha</attribute>
             </xpath>
