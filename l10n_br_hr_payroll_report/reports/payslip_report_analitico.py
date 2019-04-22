@@ -433,14 +433,14 @@ def analytic_report(pool, cr, uid, local_context, context):
             "('normal')")
 
         # Rescisoes
-        domain = busca + [('tipo_de_folha', '=', eval(wizard.tipo_de_folha)[1])]
+        domain = busca + [('tipo_de_folha', 'in', [eval(wizard.tipo_de_folha)[1], 'rescisao_complementar'])]
         payslip_rescisoes_ids = pool['hr.payslip'].search(cr, uid, domain)
         payslips_rescisoes = \
             pool['hr.payslip'].browse(cr, uid, payslip_rescisoes_ids)
         # Linhas das rescisoes para totalizadores
         payslip_lines_rescisoes = get_payslip_lines(
             cr, wizard.mes_do_ano, wizard.ano, wizard.company_id.id,
-            "('rescisao')")
+            "('rescisao', 'rescisao_complementar')")
 
     else:
         busca.append(('tipo_de_folha', '=', eval(wizard.tipo_de_folha)))
@@ -451,10 +451,15 @@ def analytic_report(pool, cr, uid, local_context, context):
             wizard.tipo_de_folha)
         payslip_lines_rescisoes = []
 
+    # Tratando o tipo para pegar tambem a rescisao complementar
+    if wizard.tipo_de_folha == "('normal', 'rescisao')":
+        tipo = "('normal', 'rescisao', 'rescisao_complementar')"
+    else:
+        tipo = wizard.tipo_de_folha
+
     # Todas as linhas para Totalizadores gerais
     payslip_lines_total = get_payslip_lines(
-            cr, wizard.mes_do_ano, wizard.ano, wizard.company_id.id,
-            wizard.tipo_de_folha)
+            cr, wizard.mes_do_ano, wizard.ano, wizard.company_id.id, tipo)
 
     # Holerites
     data.update({'objects': payslips})
@@ -495,7 +500,7 @@ def analytic_report(pool, cr, uid, local_context, context):
     # Linhas dos holerites para totalizadores do SEFIP
     payslip_lines_sefip = get_payslip_lines(
         cr, wizard.mes_do_ano, wizard.ano, wizard.company_id.id,
-        wizard.tipo_de_folha, sefip=True)
+        tipo, sefip=True)
 
     totalizadores_sefip(data, payslip_lines_sefip)
 
