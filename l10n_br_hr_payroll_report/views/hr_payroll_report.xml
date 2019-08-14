@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<openerp>
+    <data>
+
+        <record id="hr_payroll.action_report_payslip" model="ir.actions.report.xml">
+            <field name="groups_id" eval="[(4, ref('base.group_no_one')), ]"/>
+        </record>
+
+         <record id="hr_payroll.payslip_details_report" model="ir.actions.report.xml">
+            <field name="groups_id" eval="[(4, ref('base.group_no_one')), ]"/>
+        </record>
+
+    </data>
+</openerp>
