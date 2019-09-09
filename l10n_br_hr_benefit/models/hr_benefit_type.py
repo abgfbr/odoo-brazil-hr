@@ -28,14 +28,16 @@ class HrBenefitType(models.Model):
         index=True,
     )
     date_start = fields.Date(
-        string='Date Start',
+        string='Data Início',
         index=True,
-        track_visibility='onchange'
+        track_visibility='onchange',
+        help='Data de início da vigência deste tipo de benefício.',
     )
     date_stop = fields.Date(
-        string='Date Stop',
+        string='Data Fim',
         index=True,
-        track_visibility='onchange'
+        track_visibility='onchange',
+        help='Data de fim da vigência deste tipo de benefício.',
     )
     amount_max = fields.Float(
         string='Valor máximo',
@@ -54,32 +56,44 @@ class HrBenefitType(models.Model):
     )
     need_approval = fields.Boolean(
         string='Aprovação gerencial',
-        track_visibility='onchange'
+        track_visibility='onchange',
+        help='Adiciona necessidade de aprovação gerencial para criação de um '
+             'benefício deste tipo',
     )
     need_approval_file = fields.Boolean(
         string='Anexo obrigatório',
-        track_visibility='onchange'
+        track_visibility='onchange',
+        help='Adiciona necessidade de arquivo de anexo para criação de um '
+             'benefício deste tipo',
     )
     line_need_approval = fields.Boolean(
         string='Aprovação gerencial',
-        track_visibility='onchange'
+        track_visibility='onchange',
+        help='Adiciona necessidade de aprovação gerencial para aprovar as '
+             'prestações de contas deste benefício',
     )
     line_need_approval_file = fields.Boolean(
         string='Anexo obrigatório',
-        track_visibility='onchange'
+        track_visibility='onchange',
+        help='Adiciona necessidade de documento anexo para aprovar as '
+             'prestações de contas deste benefício',
     )
     line_days_approval_limit = fields.Integer(
-        string='Limite de aprovação em dias'
+        string='Limite de aprovação em dias',
+        help='Limite em dias para aprovar o benefício. Após esse limite '
+             'somente um funcionário do RH poderá aprová-lo.',
     )
     income_rule_id = fields.Many2one(
         comodel_name="hr.salary.rule",
         # required=True,
         string=u"Provento / Benefício (+)",
+        help='Rúbrica de provento utilizada pelo benefício',
     )
     deduction_rule_id = fields.Many2one(
         comodel_name="hr.salary.rule",
         # required=True,
         string=u"Dedução / Desconto (-)",
+        help='Rúbrica de dedução utilizada pelo benefício',
     )
     python_code = fields.Text(
         string='Código Python',
@@ -100,6 +114,7 @@ class HrBenefitType(models.Model):
         ],
         string='Tipo de Cálculo',
         required=True,
+        help='Cálculo utilizado para o valor final do benefício',
     )
     min_worked_days = fields.Integer(
         default=0,
@@ -110,11 +125,15 @@ class HrBenefitType(models.Model):
         string='Necessita Apuração?',
         default=True,
         track_visibility='onchange',
+        help='O funcionário precisará inserir valor e clicar em apurar caso '
+             'selecionado.',
     )
     line_group_benefits = fields.Boolean(
         string='Agrupar prestação de contas?',
         default=True,
         track_visibility='onchange',
+        help='Caso selecionado, múltiplos benefícios serão inseridos numa '
+             'única entrada de holerite.',
     )
     daily_admission_type = fields.Selection(
         string='Benefício na Admissão',
@@ -122,11 +141,16 @@ class HrBenefitType(models.Model):
         default='partial',
     )
     beneficiary_list = fields.Boolean(
-        string="Usar lista de beneficiarios ao invés de parceiro"
+        string="Usar lista de beneficiarios ao invés de parceiro",
+        help='Utiliza uma lista de nomes de beneficiários ao invés de '
+             'selecionar um parceiro para receber este benefício. Usado no '
+             'benefício seguro de vida.',
     )
     extra_income = fields.Boolean(
         string='13º Benefício?',
         default=False,
+        help='Caso selecionado, o benefício será aplicado, também, no mês do '
+             '13º salário.',
     )
     extra_income_month = fields.Selection(
         string='Mês 13º Benefício',
@@ -145,103 +169,6 @@ class HrBenefitType(models.Model):
             ('12', 'Dezembro')
         ],
     )
-    instrucao = fields.Html(
-        string='Instrução para Importação',
-        compute='_get_default_instrucao',
-        readonly=True,
-    )
-
-    def _get_default_instrucao(self):
-        self.instrucao = """
-        
-        <br />
-        <h3>Variáveis disponíveis</h3> 
-        <br />
-        
-        <style type="text/css">
-.tg  {border-collapse:collapse;border-spacing:0;border-color:#aabcfe;}
-.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#669;background-color:#e8edff;}
-.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#039;background-color:#b9c9fe;}
-.tg .tg-phtq{background-color:#D2E4FC;border-color:inherit;text-align:left;vertical-align:top}
-.tg .tg-baqh{text-align:center;vertical-align:top}
-.tg .tg-c3ow{border-color:inherit;text-align:center;vertical-align:top}
-.tg .tg-0pky{border-color:inherit;text-align:left;vertical-align:top}
-.tg .tg-svo0{background-color:#D2E4FC;border-color:inherit;text-align:center;vertical-align:top}
-.tg .tg-0lax{text-align:left;vertical-align:top}
-</style>
-
-<ul class="tg" class="oe_center">
-    <li><b>
-        amount_benefit
-    </b></li>
-    <ul><li>
-        Valor Apurado
-    </li></ul>
-    
-    <li><b>
-        amount_base
-    </b></li>
-    <ul><li>
-        Valor Comprovado
-    </li></ul>
-    
-    <li><b>
-        income_amount
-    </b></li>
-    <ul><li>
-        Valor apurado do Provento
-    </li></ul>
-    
-    <li><b>
-        income_percentual
-    </b></li>
-    <ul><li>
-        Percentual apurado do Provento
-    </li></ul>
-    
-    <li><b>
-        income_quantity
-    </b></li>
-    <ul><li>
-        Quantidade apurada do Provento
-    </li></ul>
-    
-    <li><b>
-        deduction_amount
-    </b></li>
-    <ul><li>
-        Valor apurado da Dedução
-    </li></ul>
-    
-    <li><b>
-        deduction_percentual
-    </b></li>
-    <ul><li>
-        Percentual apurado da Dedução
-    </li></ul>
-    
-    <li><b>
-        deduction_quantity
-    </b></li>
-    <ul><li>
-        Quantidadae apurada da Dedução
-    </li></ul>
-    
-    <li><b>
-        max_age_full_income
-    </b></li>
-    <ul><li>
-        Idade máxima, em meses, para receber o auxílio Creche/Babá em sua totalidade. O valor apurado é, neste caso, igual ao valor comprovado. (Caso não preenchido, o valor padrão é 5 meses)
-    </li></ul>
-    
-    <li><b>
-        max_age_income
-    </b></li>
-    <ul><li>
-        Idade máxima, em meses, para receber o auxílio Creche/Babá até o limite do teto. O valor apurado é, neste caso, o menor valor entre teto e valor comprovado. (Caso não preenchido, o valor padrão é 71 meses)
-    </li></ul>
-</ul>
-        """
 
     @api.onchange('extra_income')
     def _onchange_extra_income(self):
