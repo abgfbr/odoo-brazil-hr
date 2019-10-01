@@ -2618,6 +2618,11 @@ class HrPayslip(models.Model):
                 localdict, rule.category_id,
                 tot_rule)
 
+            # Verificar se a rubrica esta nas rubricas especificas
+            if applied_specific_rule.get(rule.id):
+                beneficiario_id = applied_specific_rule.get(rule.id)[0]\
+                    .get('beneficiario_id')
+
             # create/overwrite the rule in the temporary results
             result_dict[random.randint(0, 10000)] = {
                 'salary_rule_id': rule.id,
@@ -2651,8 +2656,7 @@ class HrPayslip(models.Model):
                     beneficiario_id and beneficiario_id.id or
                     payslip.contract_id.employee_id.address_home_id and
                     payslip.contract_id.employee_id.address_home_id.id or
-                    False
-                ,
+                    False,
             }
 
             if rule.category_id.code == 'DEDUCAO':
