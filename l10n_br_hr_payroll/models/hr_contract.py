@@ -9,7 +9,7 @@ from openerp import api, fields, models
 from openerp import exceptions
 from pybrasil.data import formata_data
 
-from ..constantes import CATEGORIA_TRABALHADOR, CATEGORIA_TRABALHADOR_SEFIP
+from ..constantes import CATEGORIA_TRABALHADOR_SEFIP
 
 
 class HrContract(models.Model):
@@ -28,11 +28,24 @@ class HrContract(models.Model):
         default=True,
     )
 
-    categoria = fields.Selection(
-        selection=CATEGORIA_TRABALHADOR,
+    # categoria = fields.Selection(
+    #     selection=CATEGORIA_TRABALHADOR,
+    #     string="Categoria do Contrato",
+    #     required=True,
+    #     default='101',
+    # )
+
+    category_id = fields.Many2one(
+        comodel_name='hr.contract.category',
         string="Categoria do Contrato",
         required=True,
-        default='101',
+        ondelete="restrict",
+    )
+
+    category_code = fields.Char(
+        string="Código da Categoria de Contrato",
+        related='category_id.code',
+        readonly=True,
     )
 
     type_id = fields.Many2one(
@@ -455,10 +468,17 @@ class HrContract(models.Model):
         help='e-Social: S2300 - categOrig',
     )
 
-    categoria_cedente = fields.Selection(
-        selection=CATEGORIA_TRABALHADOR,
+    # categoria_cedente = fields.Selection(
+    #     selection=CATEGORIA_TRABALHADOR,
+    #     string="Categoria do Contrato no cedente",
+    #     help='e-Social: S2300 - categOrig',
+    # )
+
+    assignor_category_id = fields.Many2one(
+        comodel_name='hr.contract.category',
         string="Categoria do Contrato no cedente",
         help='e-Social: S2300 - categOrig',
+        ondelete="restrict",
     )
 
     funcionario_cedido = fields.Boolean(
@@ -558,26 +578,26 @@ class HrContract(models.Model):
             pass
 
     @api.multi
-    @api.depends('categoria')
+    @api.depends('category_id')
     def _compute_categoria_sefip(self):
 
         for record in self:
-            if record.categoria in ('701', '702', '703'):
+            if record.category_id.code in ('701', '702', '703'):
                 #
                 # Autônomo
                 #
                 record.categoria_sefip = '13'
-            elif record.categoria == '721':
+            elif record.category_id.code == '721':
                 #
                 # Pró-labore
                 #
                 record.categoria_sefip = '05'
-            elif record.categoria in ['722','723']:
+            elif record.category_id.code in ['722','723']:
                 #
                 # Pró-labore 2
                 #
                 record.categoria_sefip = '11'
-            elif record.categoria == '103':
+            elif record.category_id.code == '103':
                 #
                 # Aprendiz
                 #

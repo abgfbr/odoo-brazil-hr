@@ -4,7 +4,6 @@
 
 <openerp>
     <data>
-
         <record model="ir.ui.view" id="hr_benefit_type_form_view">
             <field name="name">hr.benefit.type.form (in l10n_br_hr_benefit)
             </field>
@@ -15,8 +14,8 @@
                     </header>
                     <sheet>
                         <h1>
-                            <label for="name"/>
-                            <field name="name"/>
+                            <label for="name" class="oe_edit_only"/>
+                            <field name="name" colspan="1" class="oe_inline"/>
                         </h1>
                         <group>
                             <group>
@@ -25,8 +24,16 @@
 
                             </group>
                             <group>
-                                <field name="amount_max"/>
-                                <field name="amount_fixed"/>
+                                <field name="type_calc"/>
+                                <field name="daily_admission_type" widget="radio"
+                                       attrs="{'invisible':[('type_calc', 'not in', ['daily'])], 'required':[('type_calc', 'not in', ['daily'])]}"/>
+                                <field name="min_worked_days" attrs="{'invisible':[('daily_admission_type', 'not in', ['rulexdays'])]}"/>
+                                <field name="percent" attrs="{'invisible':[('type_calc', 'not in', ['percent', 'percent_max'])]}"/>
+                                <field name="amount_max" attrs="{'invisible':[('type_calc', 'not in', ['max', 'percent_max'])]}"/>
+                                <field name="amount" attrs="{'invisible':[('type_calc', 'not in', ['fixed', 'daily'])]}" />
+                                <field name="extra_income"/>
+                                <field name="extra_income_month"
+                                       attrs="{'invisible':[('extra_income', '=', False)], 'required':[('extra_income', '=', True)]}"/>
                             </group>
                         </group>
                         <notebook>
@@ -35,29 +42,165 @@
                                     <group string="Benefício">
                                         <field name="need_approval"/>
                                         <field name="need_approval_file"/>
-                                    </group>
-                                    <group string="Tipos de Beneficiários">
-                                        <field name="beneficiario_funcionario"/>
-                                        <field name="beneficiario_dependente"/>
-                                        <field name="beneficiario_autonomo"/>
-                                        <field name="beneficiario_terceiro"/>
-                                        <field name="beneficiario_cedido"/>
+                                        <field name="beneficiary_list"/>
                                     </group>
                                     <group string="Prestaçao de Contas">
                                         <field name="line_need_approval"/>
                                         <field name="line_need_approval_file"/>
+                                        <field name="line_need_clearance"
+                                               attrs="{'readonly': ['|',
+                                               ('line_need_approval', '=', True),
+                                               ('line_need_approval_file', '=', True)]}"/>
+                                        <field name="line_group_benefits"/>
+                                        <field name="line_days_approval_limit"/>
                                     </group>
                                 </group>
+                                <group string="Beneficiários aptos ao Benefício">
+-                                    <field name="contract_category_ids" nolabel="1"/>
+-                                </group>
                             </page>
                             <page string="Integração com a Folha" name="fopag">
-                                <label for="deduction_rule_id"/>
-                                <field name="deduction_rule_id" nolabel="1"/>
-                                <label for="income_rule_id"/>
-                                <field name="income_rule_id" nolabel="1"/>
+                                <group>
+                                    <label for="deduction_rule_id"/>
+                                    <field name="deduction_rule_id"
+                                           nolabel="1"/>
+                                    <label for="income_rule_id"/>
+                                    <field name="income_rule_id" nolabel="1"/>
+                                </group>
                             </page>
                             <page string="Python Code">
                                 <label for="python_code"/>
-                                <field name="python_code" nolabel="1"/>
+                                <field name="python_code" nolabel="1"
+                                       class="oe_inline"/>
+                                <group col="2" string="Instruções para implementação das regras do benefício via Python Code:">
+                                    <group>
+                                        <label colspan="2" string="amount_benefit"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Valor Apurado"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="amount_base"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Valor Comprovado"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="income_amount"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Valor apurado do Provento"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="income_percentual"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Percentual apurado do Provento"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="income_quantity"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Quantidade apurada do Provento"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="deduction_amount"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Valor apurado da Dedução"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="deduction_percentual"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Percentual apurado da Dedução"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="deduction_quantity"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Quantidadae apurada da Dedução"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="max_age_full_income"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Idade máxima, em meses, para receber o auxílio Creche/Babá em sua totalidade. O valor apurado é, neste caso, igual ao valor comprovado. (Caso não preenchido, o valor padrão é 5 meses)"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="2" string="max_age_income"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="* Idade máxima, em meses, para receber o auxílio Creche/Babá até o limite do teto. O valor apurado é, neste caso, o menor valor entre teto e valor comprovado. (Caso não preenchido, o valor padrão é 71 meses)"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="4"
+                                               string="Exemplo benefício VR"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="deduction_amount = 0.01 * amount_benefit"/>
+                                            <label colspan="2"
+                                                   string="deduction_percentual = 100"/>
+                                            <label colspan="2"
+                                                   string="deduction_quantity = 1"/>
+                                            <label colspan="2"
+                                                   string="income_amount = amount_benefit"/>
+                                            <label colspan="2"
+                                                   string="income_percentual = 100"/>
+                                            <label colspan="2"
+                                                   string="income_quantity = 1"/>
+                                        </group>
+                                    </group>
+
+                                    <group>
+                                        <label colspan="4"
+                                               string="Exemplo benefício Creche"
+                                               style="font-size:1.2em;font-weight:bold;"/>
+                                        <group>
+                                            <label colspan="2"
+                                                   string="max_age_full_income = 5"/>
+                                            <label colspan="2"
+                                                   string="max_age_income = 71"/>
+                                            <label colspan="2"
+                                                   string="income_amount = amount_benefit"/>
+                                            <label colspan="2"
+                                                   string="income_percentual = 100"/>
+                                            <label colspan="2"
+                                                   string="income_quantity = 1"/>
+                                        </group>
+                                    </group>
+                                </group>
                             </page>
                         </notebook>
                     </sheet>
@@ -80,12 +223,7 @@
                     <field name="date_start"/>
                     <field name="date_stop"/>
                     <field name="amount_max"/>
-                    <field name="amount_fixed"/>
-                    <filter string="Funcionario" name="filtro_funcionario" domain="[('beneficiario_funcionario', '=', True)]"/>
-                    <filter string="Dependente" name="filtro_dependente" domain="[('beneficiario_dependente', '=', True)]"/>
-                    <filter string="Autonomo" name="filtro_autonomo" domain="[('beneficiario_autonomo', '=', True)]"/>
-                    <filter string="Terceiro" name="filtro_terceiro" domain="[('beneficiario_terceiro', '=', True)]"/>
-                    <filter string="Cedido" name="filtro_cedido" domain="[('beneficiario_cedido', '=', True)]"/>
+                    <field name="amount"/>
                     <filter string="Necessita aprovação" name="filtro_aprovacao"
                             domain="['|',('need_approval', '=', True),'|',('line_need_approval', '=', True),'|',('need_approval_file', '=', True),('line_need_approval_file', '=', True)]"/>
                     <filter string="Não necessita aprovação" name="filtro_sem_aprovacao"
@@ -110,8 +248,13 @@
                     <field name="date_start"/>
                     <field name="date_stop"/>
                     <field name="amount_max"/>
-                    <field name="amount_fixed"/>
-                    <field name="need_approval"/>
+                    <field name="amount"/>
+                    <field name="need_approval" string="Aprovação Benefício?"/>
+                    <field name="need_approval_file" string="Necessita Anexo?"/>
+                    <field name="need_approval" string="Aprovação Prestação?"/>
+                    <field name="need_approval_file" string="Necessita Anexo?"/>
+                    <field name="line_need_clearance"/>
+                    <field name="line_group_benefits"/>
                 </tree>
             </field>
         </record>

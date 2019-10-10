@@ -6,7 +6,41 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
 from openerp import api, fields, models, _
-from openerp.exceptions import Warning
+from openerp.exceptions import Warning, ValidationError
+
+from datetime import date
+from pybrasil.data import dias_uteis
+from pybrasil.data import ultimo_dia_mes
+from datetime import datetime, tzinfo, timedelta
+from openerp.tools.safe_eval import safe_eval
+import logging
+
+logger = logging.getLogger(__name__)
+
+BENEFIT_TYPE = {
+    'va_vr': ['va', 'vr'],
+    'saude': ['Auxílio Saúde'],
+    'cesta': ['Cesta Alimentação'],
+    'creche': ['Creche / Babá', 'creche', 'babá'],
+    'seguro_vida': ['Seguro de Vida', 'Seguro Vida'],
+}
+
+
+def _calc_age_in_months(entry_date):
+    now = datetime.now()
+
+    entry_datetime = datetime.strptime(entry_date, '%Y-%m-%d')
+
+    years = now.year - entry_datetime.year
+    months = now.month - entry_datetime.month
+
+    if now.day < entry_datetime.day:
+        months -= 1
+    while months < 0:
+        months += 12
+        years -= 1
+
+    return months + 12 * years
 
 
 class HrContractBenefitLine(models.Model):
@@ -19,6 +53,133 @@ class HrContractBenefitLine(models.Model):
             return False
         return self.env.user.employee_ids[0].contract_id
 
+    def _eval_min_max_age_creche(self):
+        max_age_full_income = 6
+        max_age_income = 71
+
+        localdict = dict(
+            max_age_full_income=max_age_full_income,
+            max_age_income=max_age_income,
+
+            amount_benefit=self.amount_benefit,
+            amount_base=self.amount_base,
+            income_amount=self.income_amount,
+            income_percentual=self.income_percentual,
+            income_quantity=self.income_quantity,
+            deduction_amount=self.deduction_amount,
+            deduction_percentual=self.deduction_percentual,
+            deduction_quantity=self.deduction_quantity,
+        )
+
+        try:
+            expression = self.benefit_type_id.python_code
+
+            safe_eval(expression, localdict, mode="exec", nocopy=True)
+
+            max_age_full_income = localdict.get('max_age_full_income')
+            max_age_income = localdict.get('max_age_income')
+        except Exception as err:
+            logger.warning(
+                'Erro na execução do Python Code do benefício creche: %s', err)
+        finally:
+            return max_age_full_income, max_age_income
+
+    @api.depends('benefit_type_id', 'amount_base')
+    def _compute_benefit(self):
+        for record in self:
+            amount_benefit = 0
+            benefit_type_id = record.benefit_type_id
+            if benefit_type_id:
+
+                normal_evaluation = True
+
+                if record._check_benefit_type('creche'):
+                    # FIND DEPENDENT
+                    dependent_id = self.env['hr.employee.dependent']\
+                        .search([('partner_id', '=', record.beneficiary_ids[:1]
+                                  .partner_id.id)])
+
+                    # CHECK IF BENEFICIARY HAS BIRTHDATE SET
+                    if not dependent_id.dependent_dob:
+                        record.amount_benefit = 0
+                        amount_benefit = 0
+                        normal_evaluation = False
+                    else:
+                        dependent_age_in_months = _calc_age_in_months(
+                            dependent_id.dependent_dob)
+                        min_age, max_age = record._eval_min_max_age_creche()
+
+                        # CHECK IF BENEFICIARY IS YOUNGER THAN 6 MONTHS
+                        if dependent_age_in_months < min_age + 1:
+                            record.amount_benefit = record.amount_base
+                            amount_benefit = record.amount_base
+                            normal_evaluation = False
+
+                        elif dependent_age_in_months > max_age and \
+                                not dependent_id.inc_trab:
+                            record.amount_benefit = 0
+                            amount_benefit = 0
+                            normal_evaluation = False
+
+                if not normal_evaluation:
+                    record.amount_benefit = amount_benefit
+                    continue
+
+                if benefit_type_id.type_calc == 'fixed':
+                    amount_benefit = benefit_type_id.amount
+
+                elif benefit_type_id.type_calc == 'max':
+                    if benefit_type_id.amount_max > record.amount_base:
+                        amount_benefit = record.amount_base
+                    else:
+                        amount_benefit = \
+                            benefit_type_id.amount_max
+
+                elif benefit_type_id.type_calc == 'daily':
+                    worked_days = 22
+
+                    partner_date_start = record.contract_id.date_start
+                    date_today = fields.Date.today()
+
+                    if partner_date_start[:7] == date_today[:7]:
+                        daily_admission_type = benefit_type_id.\
+                            daily_admission_type
+                        company_id = record.beneficiary_ids[:1].\
+                            partner_id.company_id
+                        if daily_admission_type == 'partial':
+                            worked_days = len(dias_uteis(
+                                data_inicial=partner_date_start,
+                                data_final=ultimo_dia_mes(partner_date_start),
+                                estado=company_id.state_id,
+                                municipio=company_id.l10n_br_city_id)
+                            )
+                        else:
+                            available_days = \
+                                (ultimo_dia_mes(partner_date_start) -
+                                 fields.Date.from_string(partner_date_start)).days
+                            if daily_admission_type == 'rule15days' and \
+                                    available_days < 15:
+                                worked_days = 0
+                            elif daily_admission_type == 'rulexdays' and \
+                                    available_days < record.\
+                                    benefit_type_id.min_worked_days:
+                                worked_days = 0
+
+                    amount_benefit = \
+                        benefit_type_id.amount * worked_days
+
+                elif benefit_type_id.type_calc == 'percent_max':
+                    amount_benefit = min(
+                        benefit_type_id.amount_max,
+                        record.amount_base * benefit_type_id.percent / 100)
+                    
+                elif benefit_type_id.type_calc == 'percent':
+                    amount_benefit = \
+                        record.amount_base * \
+                        benefit_type_id.percent / 100
+
+            record.amount_benefit = amount_benefit
+
     state = fields.Selection(
         selection=[
             ('todo', 'Aguardando Comprovante'),
@@ -26,6 +187,7 @@ class HrContractBenefitLine(models.Model):
             ('validated', 'Apurado'),
             ('exception', 'Negado'),
             ('cancel', 'Cancelado'),
+            ('payslip_deleted', 'Holerite Cancelado'),
         ],
         string='Situação',
         index=True,
@@ -37,6 +199,7 @@ class HrContractBenefitLine(models.Model):
     )
     benefit_type_id = fields.Many2one(
         comodel_name='hr.benefit.type',
+        ondelete='restrict',
         required=True,
         readonly=True,
         string='Tipo Benefício',
@@ -97,9 +260,11 @@ class HrContractBenefitLine(models.Model):
     amount_benefit = fields.Float(
         string='Valor Apurado',
         index=True,
+        stored=True,
         track_visibility='onchange',
-        states={'todo': [('readonly', False)]},
+        # states={'todo': [('readonly', False)]},
         readonly=True,
+        compute='_compute_benefit',
     )
     attachment_ids = fields.Many2many(
         comodel_name='ir.attachment',
@@ -133,6 +298,7 @@ class HrContractBenefitLine(models.Model):
         comodel_name="hr.payslip",
         string="Folha de pagamento",
         readonly=True,
+        ondelete='set null',
     )
     income_amount = fields.Float(
         string='Valor apurado',
@@ -155,7 +321,7 @@ class HrContractBenefitLine(models.Model):
 
     @api.model
     def map_valid_benefit_line_to_payslip(self, hr_payslip_id):
-        """ Dado um conjunto de beneficios apurados, mapeia quais deles podem
+        """ Dado um conjunto de Benefícios apurados, mapeia quais deles podem
          compor uma folha de pagamento.
 
         OBS: Não deve ser feita nenhuma validação neste método, apenas na
@@ -204,30 +370,195 @@ class HrContractBenefitLine(models.Model):
         self.income_rule_id = self.benefit_type_id.income_rule_id
         self.deduction_rule_id = self.benefit_type_id.deduction_rule_id
 
+        self._generate_calculated_values()
+
+    def _check_benefit_type(self, benefit_key):
+        return BENEFIT_TYPE.get(benefit_key) and \
+               any([benef.lower() in self.name.lower() for benef in
+                    BENEFIT_TYPE.get(benefit_key)])
+
+    @api.multi
+    def _generate_calculated_values(self):
+        self.ensure_one()
+
+        if self._check_benefit_type('va_vr'):
+            # PYTHON CODE
+                # deduction_amount = 0.01 * amount_benefit
+                # deduction_percentual = 100
+                # deduction_quantity = 1
+                # income_amount = amount_benefit
+                # income_percentual = 100
+                # income_quantity = 1
+            # PYTHON CODE END
+            self._eval_python_code()
+
+        elif self._check_benefit_type('saude'):
+            # PYTHON CODE
+                # income_amount = amount_benefit
+                # income_percentual = 100
+                # income_quantity = 1
+            # PYTHON CODE END
+            self._eval_python_code()
+
+        elif self._check_benefit_type('cesta'):
+            # PYTHON CODE
+                # income_amount = amount_benefit
+                # income_percentual = 100
+                # income_quantity = 1
+            # PYTHON CODE END
+            self._eval_python_code()
+
+        elif self._check_benefit_type('creche'):
+            # PYTHON CODE
+                # income_amount = amount_benefit
+                # income_percentual = 100
+                # income_quantity = 1
+            # PYTHON CODE END
+            if self._generate_calculated_values_creche():
+                self._eval_python_code()
+
+        elif self._check_benefit_type('seguro_vida'):
+            # PYTHON CODE
+                # income_amount = amount_benefit
+                # income_percentual = 100
+                # income_quantity = 1
+            # PYTHON CODE END
+            self._eval_python_code()
+
+    def _eval_python_code(self):
+
+        if self.contract_id.category_id not in \
+                self.benefit_type_id.contract_category_ids:
+            self.exception_message = \
+                _('Este funcionário não possui uma categoria de '
+                  'contrato apta para o tipo de benefício escolhido. '
+                  'O benefício foi cancelado')
+            self.state = 'exception'
+            self.beneficiary_ids[:1].button_cancel()
+
+            return
+
+        localdict = dict(
+            max_age_full_income='',
+            max_age_income='',
+
+            amount_benefit=self.amount_benefit,
+            amount_base=self.amount_base,
+            income_amount=self.income_amount,
+            income_percentual=self.income_percentual,
+            income_quantity=self.income_quantity,
+            deduction_amount=self.deduction_amount,
+            deduction_percentual=self.deduction_percentual,
+            deduction_quantity=self.deduction_quantity,
+        )
+
+        try:
+            expression = self.benefit_type_id.python_code
+
+            safe_eval(expression, localdict, mode="exec", nocopy=True)
+
+            for key, value in localdict.items():
+                if hasattr(self, key):
+                    self[key] = value
+
+            self._generate_calculated_values_13()
+        except Exception as e:
+            self.exception_message = \
+                'Rejeitado pois a expressão de cálculo dos valores deste ' \
+                'benefício está incorreta.'
+            self.state = 'exception'
+
+    def _generate_calculated_values_13(self):
+        # 13º
+        if self.benefit_type_id.extra_income and \
+                date.today().month == \
+                int(self.benefit_type_id.extra_income_month):
+            self.income_quantity += 1
+
+    def _generate_calculated_values_creche(self):
+        dependent_id = self.env['hr.employee.dependent'] \
+            .search([('partner_id', '=', self.beneficiary_ids[0]
+                      .partner_id.id)])
+
+        if not dependent_id:
+            self.exception_message = 'Reijeitado pois o beneficiário não' \
+                                     ' está mais na idade aceita para ' \
+                                     'este benefício. O benefício foi ' \
+                                     'cancelado.'
+            self.state = 'exception'
+            self.beneficiary_ids[:1].button_cancel()
+            return False
+        # CHECK IF BENEFICIARY HAS BIRTHDATE SET
+        elif dependent_id.dependent_dob:
+            dependent_age_in_months = _calc_age_in_months(
+                dependent_id.dependent_dob)
+            min_age, max_age = self._eval_min_max_age_creche()
+
+            if dependent_age_in_months > max_age and not dependent_id.inc_trab:
+                self.exception_message = 'Reijeitado pois o beneficiário não' \
+                                         ' está mais na idade aceita para ' \
+                                         'este benefício. O benefício foi ' \
+                                         'cancelado.'
+                self.state = 'exception'
+                self.beneficiary_ids[:1].button_cancel()
+                return False
+            else:
+                return True
+        else:
+            self.exception_message = 'Reijeitado pois o beneficiário não' \
+                                     ' possui uma data de nascimento ' \
+                                     'cadastrada. O benefício foi ' \
+                                     'cancelado.'
+            self.state = 'exception'
+            self.beneficiary_ids[:1].button_cancel()
+            return False
+
+    def check_approve_limit(self):
+        today = datetime.today()
+        create_date = fields.Datetime.from_string(
+            self.create_date)
+        days_since_created = (today - create_date).days
+
+        if self.benefit_type_id.line_days_approval_limit and \
+                days_since_created > \
+                self.benefit_type_id.line_days_approval_limit:
+            # CHECK PERMISSION
+            if not self.env.user.has_group('base.group_hr_manager'):
+                return False
+        return True
+
     @api.multi
     def button_send_receipt(self):
         for record in self:
+            if not record.check_approve_limit():
+                raise Warning(_("""\nSomente membros do RH podem aprovar 
+                benefícios após a data limite de confirmação"""))
             if (record.benefit_type_id.line_need_approval_file and
                     not record.attachment_ids):
                 raise Warning(_("""\nPara enviar para aprovação é necessário
                  anexar o comprovante"""))
 
-            if not record.amount_base:
+            if record.benefit_type_id.line_need_clearance and \
+                    not record.amount_base:
                 raise Warning(
                     _('Para enviar para aprovação é '
                       'necessário anexar ao menos um '
                       'comprovante e preencher o '
                       'valor comprovado'))
 
-            if not record.benefit_type_id.line_need_approval:
-                record.state = 'validated'
-            else:
-                record.state = 'waiting'
-                record._get_rules()
+            record._get_rules()
+            if record.state not in ['exception']:
+                if not record.benefit_type_id.line_need_approval:
+                    record.state = 'validated'
+                else:
+                    record.state = 'waiting'
 
     @api.multi
     def button_approve_receipt(self):
         for record in self:
+            if not record.check_approve_limit():
+                raise Warning(_("""\nSomente membros do RH podem aprovar 
+                benefícios após a data limite de confirmação"""))
             if record.benefit_type_id.line_need_approval and not \
                     self.env.user.has_group('base.group_hr_user'):
                 raise Warning(
@@ -253,3 +584,18 @@ class HrContractBenefitLine(models.Model):
         for record in self:
             if record.state in 'exception':
                 record.state = 'todo'
+
+    @api.model
+    def create(self, vals):
+        hr_users = self.env.ref('base.group_hr_user').users
+        partner_ids = [user.partner_id.id for user in hr_users]
+        vals.update({
+            'message_follower_ids': partner_ids
+        })
+
+        return super(HrContractBenefitLine, self).create(vals)
+
+    @api.model
+    def _needaction_domain_get(self):
+        res = super(HrContractBenefitLine, self)._needaction_domain_get()
+        return ['|'] + res + [('state', '=', 'waiting')]

@@ -19,6 +19,18 @@ class HrContractBenefit(models.Model):
             return False
         return self.env.user.employee_ids[0].contract_id
 
+    def action_view_benefit_lines(self, cr, uid, ids, context=None):
+        benefit = self.pool.get('hr.contract.benefit').browse(cr, uid, ids)
+        return {
+            'name': _('Prestação de contas'),
+            'view_type': 'tree,form',
+            'view_mode': 'tree,form',
+            'res_model': 'hr.contract.benefit.line',
+            'context': context,
+            'type': 'ir.actions.act_window',
+            'domain': [('id', 'in', benefit.line_ids.ids)]
+        }
+
     state = fields.Selection(
         selection=[
             ('draft', 'Rascunho'),
@@ -37,6 +49,7 @@ class HrContractBenefit(models.Model):
     )
     benefit_type_id = fields.Many2one(
         comodel_name='hr.benefit.type',
+        ondelete='restrict',
         string='Tipo Benefício',
         index=True,
         required=True,
@@ -77,8 +90,8 @@ class HrContractBenefit(models.Model):
     )
     partner_id = fields.Many2one(
         comodel_name='res.partner',
+        ondelete='restrict',
         index=True,
-        required=True,
         string='Beneficiário',
         track_visibility='onchange',
         states={'draft': [('readonly', False)]},
@@ -118,34 +131,41 @@ class HrContractBenefit(models.Model):
         "# Apurações", compute='_compute_line_count',
         readonly=True,
     )
+    insurance_beneficiary_ids = fields.One2many(
+        comodel_name='benefit.insurance.beneficiary',
+        inverse_name='benefit_id',
+        string='Beneficiários do Seguro de Vida',
+        track_visibility='onchange'
+    )
+    beneficiary_list = fields.Boolean(
+        related='benefit_type_id.beneficiary_list'
+    )
 
     @api.one
     @api.constrains('employee_id', 'benefit_type_id', 'partner_id')
     def valida_funcionario(self):
         self.ensure_one()
         if self.employee_id and self.benefit_type_id and self.partner_id:
-            if (self.employee_id.tipo == 'funcionario' and not
-                    self.benefit_type_id.beneficiario_funcionario):
+
+            benefit_ids = self.search([
+                ('benefit_type_id.deduction_rule_id', '=',
+                 self.benefit_type_id.deduction_rule_id.id),
+                ('benefit_type_id.income_rule_id', '=',
+                 self.benefit_type_id.income_rule_id.id),
+                ('partner_id', '=', self.partner_id.id),
+            ]) - self
+
+            if benefit_ids:
                 raise ValidationError(
-                    _('Funcionários não são permitidos para este benefício')
+                    _('Este beneficiário já possui um benefício '
+                      'ativo para a rúbrica %s' % self.benefit_type_id.name)
                 )
 
-            if (self.employee_id.tipo == 'autonomo' and not
-                    self.benefit_type_id.beneficiario_autonomo):
+            if self.contract_id.category_id not in \
+                    self.benefit_type_id.contract_category_ids:
                 raise ValidationError(
-                    _('Autônomo não são permitido para este benefício')
-                )
-
-            if (self.employee_id.tipo == 'terceirizado' and not
-                    self.benefit_type_id.beneficiario_terceiro):
-                raise ValidationError(
-                    _('Terceirizados não são permitido para este benefício')
-                )
-
-            if (self.employee_id.tipo == 'cedido' and not
-                    self.benefit_type_id.beneficiario_cedido):
-                raise ValidationError(
-                    _('Cedidos não são permitido para este benefício')
+                    _('Este funcionário não possui uma categoria de '
+                      'contrato apta para o tipo de benefício escolhido.')
                 )
 
             if self.partner_id.is_employee_dependent:
@@ -188,10 +208,15 @@ class HrContractBenefit(models.Model):
     @api.constrains("date_start", "date_stop", "benefit_type_id",
                     "partner_id")
     def _check_dates(self):
+
+        partner_domain = ('partner_id', '=', self.partner_id.id)
+        if not self.partner_id:
+            partner_domain = ('contract_id', '=', self.contract_id.id)
+
         domain = [
             ('id', '!=', self.id),
             ('benefit_type_id', '=', self.benefit_type_id.id),
-            ('partner_id', '=', self.partner_id.id),
+            partner_domain,
             ('date_start', '<=', self.date_start),
             '|',
             ('date_stop', '=', False),
@@ -209,10 +234,16 @@ class HrContractBenefit(models.Model):
         'benefit_type_id', 'partner_id', 'date_start', 'date_stop')
     def _compute_benefit_name(self):
         for record in self:
-            if not record.partner_id or \
-                    not record.benefit_type_id:
-                record.name = 'Novo'
-                continue
+            if not record.partner_id:
+                if record.beneficiary_list:
+                    record.name = '{} - {}'.format(
+                        record.employee_id.name or '',
+                        record.benefit_type_id.name or ''
+                    )
+                    continue
+                elif not record.benefit_type_id:
+                    record.name = 'Novo'
+                    continue
             name = '%s - %s' % (
                 record.partner_id.name or '',
                 record.benefit_type_id.name or '')
@@ -258,19 +289,47 @@ class HrContractBenefit(models.Model):
         beneficios_agrupados = self._agrupar_beneficios()
 
         result = self.env['hr.contract.benefit.line']
+        benefit_line_model = self.env['hr.contract.benefit.line']
 
         for contract_id, benefit_type_id in beneficios_agrupados:
-            result |= self.env['hr.contract.benefit.line'].create({
+            tmp_result = self.env['hr.contract.benefit.line']
+            vals = {
                 'benefit_type_id': benefit_type_id.id,
                 'contract_id': contract_id.id,
                 'period_id': period_id.id,
-                'beneficiary_ids': [(6, 0,
-                                     beneficios_agrupados[
-                                         (contract_id, benefit_type_id)
-                                     ].ids)],
                 # TODO: Talvez transformar em um metodo para valdiar as datas.
                 #   Ou tratar no SQL acima
-            })
+            }
+
+            grouped_benefit_ids = beneficios_agrupados[
+                (contract_id, benefit_type_id)]
+
+            if benefit_type_id.line_group_benefits:
+
+                vals.update({
+                    'beneficiary_ids': [(6, 0, grouped_benefit_ids.ids)],
+                })
+                tmp_result |= benefit_line_model.create(vals)
+                result |= tmp_result
+            else:
+                for beneficio in grouped_benefit_ids:
+                    vals.update({
+                        'beneficiary_ids': [(6, 0, beneficio.ids)],
+                    })
+                    tmp_result |= benefit_line_model.create(vals)
+                    result |= tmp_result
+
+            if not benefit_type_id.line_need_clearance:
+                try:
+                    for benefit_line_id in tmp_result:
+                        benefit_line_id.amount_base = \
+                            benefit_line_id.amount_benefit
+                        benefit_line_id.button_send_receipt()
+                except Exception as e:
+                    raise ValidationError(_(
+                        "Verifique as configurações do benefit.type %s"
+                        "\nErro: %s" % (benefit_type_id.name, str(e))
+                    ))
 
         return result
 
@@ -330,16 +389,98 @@ class HrContractBenefit(models.Model):
                 )
         return super(HrContractBenefit, self).unlink()
 
-    @api.multi
-    def write(self, vals):
+    def _validate_benefit(self, vals):
+
         if self.env.user.has_group('base.group_hr_user') and \
                 vals.get('state') == 'waiting':
             vals.update({'state': 'validated'})
+
+    def _post_beneficiary_message(self, vals):
+        msg = ''
+        for item in vals:
+            line = self.env['benefit.insurance.beneficiary'].browse(item[1])
+            if item[0] == 4 and not item[2]:
+                continue
+            elif item[0] == 2:
+                msg += 'Beneficiário {} foi excluído.' \
+                       ' <br/><br/>'.format(line.beneficiary_name)
+            elif item[0] == 0 and item[2]:
+                msg += 'Novo beneficiário: {} ({}%). <br/>' \
+                       '<br/>'.format(item[2].get('beneficiary_name'),
+                                      item[2].get('benefit_percent'))
+            elif item[0] == 1 and item[2]:
+                for key, value in item[2].iteritems():
+                    if key == 'beneficiary_name':
+                        msg += 'Nome de beneficiário atualizado ' \
+                               'de %s para %s <br/>' % (
+                            line.beneficiary_name, value)
+                    elif key == 'benefit_percent':
+                        msg += 'Porcentagem do benefício do(a) ' \
+                               '{} atualizado para {} % <br/>'.format(
+                            line.beneficiary_name, value)
+                msg += '<br/>'
+        self.message_post(msg)
+
+    @api.multi
+    def write(self, vals):
+        self._validate_benefit(vals)
+        if vals.get('insurance_beneficiary_ids'):
+            self._post_beneficiary_message(
+                vals.get('insurance_beneficiary_ids'))
         return super(HrContractBenefit, self).write(vals)
 
     @api.model
     def create(self, vals):
-        if self.env.user.has_group('base.group_hr_user') and \
-                vals.get('state') == 'waiting':
-            vals.update({'state': 'validated'})
+        self._validate_benefit(vals)
+        hr_users = self.env.ref('base.group_hr_user').users
+        partner_ids = [user.partner_id.id for user in hr_users]
+        vals.update({
+            'message_follower_ids': partner_ids
+        })
         return super(HrContractBenefit, self).create(vals)
+
+    @api.constrains('insurance_beneficiary_ids')
+    def _constrains_benefit_percent(self):
+        for record in self:
+            total_percent = sum([line.benefit_percent for
+                                 line in record.insurance_beneficiary_ids])
+            if total_percent > 100:
+                raise ValidationError(
+                    _('A porcentagem total de recebimento dos beneficiários '
+                      'do Seguro de Vida é maior que 100%'.format(
+                        total_percent))
+                )
+
+    @api.onchange('benefit_type_id')
+    def _onchange_benefit_type(self):
+        for record in self:
+            if record.beneficiary_list:
+                record.partner_id = False
+            elif not record.beneficiary_list:
+                record.insurance_beneficiary_ids = False
+
+    @api.model
+    def _needaction_domain_get(self):
+        res = super(HrContractBenefit, self)._needaction_domain_get()
+        return ['|'] + res + [('state', '=', 'waiting')]
+
+
+class HrContractBenefitInsuranceBeneficiary(models.Model):
+    _name = b'benefit.insurance.beneficiary'
+
+    benefit_id = fields.Many2one(
+        comodel_name='hr.contract.benefit',
+        string='Benefício relacionado'
+    )
+    beneficiary_name = fields.Char(
+        string='Beneficiário do seguro'
+    )
+    benefit_percent = fields.Integer(
+        string='Porcentagem para o beneficiário'
+    )
+
+    @api.multi
+    def compute_display_name(self):
+        for record in self:
+            record.display_name = record.beneficiary_name + \
+                                  '({}%)'.format(str(record.benefit_percent))
