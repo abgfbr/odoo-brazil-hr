@@ -31,8 +31,8 @@
                     <sheet>
                         <div class="oe_right oe_button_box" name="buttons">
                             <button class="oe_inline oe_stat_button"
-                                    type="action"
-                                    name="%(l10n_br_hr_benefit.hr_contract_benefit_line_act_window)d"
+                                    type="object"
+                                    name="action_view_benefit_lines"
                                     icon="fa-book"
                                     context="{'search_default_partner_ids': active_ids}"
                             >
@@ -50,9 +50,10 @@
                         </h2>
                         <group>
                             <group>
+                                <field name="beneficiary_list" invisible="1"/>
                                 <field name="contract_id" groups="base.group_hr_user"/>
                                 <field name="employee_id" invisible="1"/>
-                                <field name="partner_id"/>
+                                <field name="partner_id" attrs="{'required': [('beneficiary_list', '=', False)], 'invisible': [('beneficiary_list', '=', True)]}"/>
                             </group>
                             <group>
                                 <field name="benefit_type_id"/>
@@ -62,6 +63,15 @@
                             </group>
                         </group>
                         <group>
+                            <label for="insurance_beneficiary_ids" colspan="4"
+                                   attrs="{'invisible': [('beneficiary_list', '=', False)]}"/>
+                            <field name="insurance_beneficiary_ids"
+                                   nolabel="1"
+                                   editable="bottom"
+                                   colspan="4"
+                                   attrs="{'required': [('beneficiary_list', '=', True)], 'invisible': [('beneficiary_list', '=', False)]}"
+                            />
+                            <separator string=""/>
                             <field name="attachment_ids"
                                    widget="many2many_binary"/>
                         </group>
@@ -91,13 +101,44 @@
                     <filter name=" filter_contract_benefit_em_vigor" string="Em Vigor"
                             icon="terp-go-today"
                             domain="[('date_stop', '&gt;=', time.strftime('%%Y-%%m-%%d')), ('date_start', '&lt;=', time.strftime('%%Y-%%m-%%d'))]"/>
+                    <filter string="Mensagens não lidas"
+                            name="message_unread"
+                            domain="['|',('message_unread', '=', True),('state', '=', 'waiting')]"
+                            help="Mensagens não lidas" />
                     <group expand="0" string="Agrupar Por...">
                         <filter string="Tipo de Benefício" name="group_by_benefit_type" context="{'group_by': 'benefit_type_id'}"/>
                         <filter string="Funcionário" name="group_by_employee" context="{'group_by': 'employee_id'}"/>
-                        <filter string="Beneficiário" name="group_by_beneficiary" context="{'group_by': 'beneficiary_id'}"/>
+                        <filter string="Beneficiário" name="group_by_beneficiary" context="{'group_by': 'partner_id'}"/>
+                        <filter string="Situação" name="group_by_situation" context="{'group_by': 'state'}"/>
                     </group>
 
                 </search>
+            </field>
+        </record>
+
+        <record id="view_insurance_beneficiary_tree_view" model="ir.ui.view">
+            <field name="model">benefit.insurance.beneficiary</field>
+            <field name="name">benefit.insurance.beneficiary.tree.view</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="benefit_id" invisible="1"/>
+                    <field name="beneficiary_name"/>
+                    <field name="benefit_percent" sum="Total"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="view_insurance_beneficiary_form_view" model="ir.ui.view">
+            <field name="model">benefit.insurance.beneficiary</field>
+            <field name="name">benefit.insurance.beneficiary.form.view</field>
+            <field name="arch" type="xml">
+                <form>
+                    <group>
+                        <field name="benefit_id" invisible="1"/>
+                        <field name="beneficiary_name"/>
+                        <field name="benefit_percent"/>
+                    </group>
+                </form>
             </field>
         </record>
 
