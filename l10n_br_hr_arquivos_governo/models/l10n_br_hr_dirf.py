@@ -204,6 +204,9 @@ class L10nBrHrDirf(models.Model):
             if rubrica[1] == 'BASE_IR':
                 total = holerites_ids.rendimentos_tributaveis
 
+            if not rubrica[1] in ['DIARIAS_VIAGEM']:
+                total = holerites_ids.rendimentos_tributaveis
+
         return total
 
     @api.multi
