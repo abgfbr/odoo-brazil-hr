@@ -327,6 +327,16 @@ class HrPayslip(models.Model):
         string=u"Mês Comercial?",
     )
 
+    salary_unit_code = fields.Char(
+        string='Tipo de Remuneração',
+    )
+
+    valor_tarefa = fields.Float(
+        string=u'Valor da Tarefa',
+        help=u'Valor da tarefa exporádica (autônomos) quando o Unidade de '
+             u'Salário definida no contrato for: "Remuneração por tarefa."',
+    )
+
     @api.depends('contract_id', 'dias_aviso_previo_trabalhados')
     @api.multi
     def _calcular_dias_aviso_previo(self):
@@ -1902,8 +1912,13 @@ class HrPayslip(models.Model):
             mes_inicial = reference_mes - 1
             ano_inicial = reference_ano
 
+        mes_final = reference_mes + 1
+        if mes_final >= 12:
+            mes_final = 1
+            reference_ano += 1
+
         data_inicial = '{}-{}-01'.format(ano_inicial, mes_inicial)
-        data_final = '{}-{}-01'.format(reference_ano, reference_mes + 1)
+        data_final = '{}-{}-01'.format(reference_ano, mes_final)
 
         domain = [
             ('tipo_de_folha', 'in', ['ferias']),
@@ -2742,6 +2757,7 @@ class HrPayslip(models.Model):
             if record.contract_id:
                 record.employee_id = record.contract_id.employee_id
                 record.company_id = record.contract_id.company_id
+                record.salary_unit_code  = record.contract_id.salary_unit.code
 
     def _compute_data_mes_ano(self):
         for record in self:
