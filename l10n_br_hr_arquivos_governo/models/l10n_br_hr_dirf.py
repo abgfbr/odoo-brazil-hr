@@ -569,8 +569,12 @@ class L10nBrHrDirf(models.Model):
             beneficiario.cpf_bpfdec = \
                 re.sub('[^0-9]', '', str(employee_id.cpf))
             beneficiario.nome_bpfdec = employee_id.name
-            self.populate_beneficiario(dirf, beneficiario, employee_id,
-                                       self.ano_referencia, self.company_id)
-            dirf.add_beneficiario(beneficiario)
+            self.populate_beneficiario(
+                dirf, beneficiario, employee_id, self.ano_referencia,
+                self.company_id)
+
+            grupo = dirf.get_grupoFuncionarioPorCodigoReceita(
+                employee_id.contract_id.codigo_guia_darf)
+            grupo.add_beneficiario(beneficiario)
 
         self.dirf = str(dirf)
