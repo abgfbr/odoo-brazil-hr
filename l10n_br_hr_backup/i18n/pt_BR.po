@@ -1,0 +1,131 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#	* l10n_br_hr_backup
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 8.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-02-12 12:49+0000\n"
+"PO-Revision-Date: 2020-02-12 12:49+0000\n"
+"Last-Translator: <>\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: l10n_br_hr_backup
+#: view:hr.backup:l10n_br_hr_backup.view_l10n_br_hr_backup
+msgid "Backup das Regras de Salario"
+msgstr "Backup das Regras de Salario"
+
+#. module: l10n_br_hr_backup
+#: help:hr.payroll.structure,generate_xml:0
+#: help:hr.salary.rule,generate_xml:0
+msgid "Cole esse xml em seu modulo"
+msgstr "Cole esse xml em seu modulo"
+
+#. module: l10n_br_hr_backup
+#: help:hr.salary.rule.category,generate_xml:0
+msgid "Cole esse xml em seu módulo"
+msgstr "Cole esse xml em seu módulo"
+
+#. module: l10n_br_hr_backup
+#: view:hr.backup:l10n_br_hr_backup.view_l10n_br_hr_backup
+msgid "Confirm Backup"
+msgstr "Confirm Backup"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,create_uid:0
+msgid "Created by"
+msgstr "Created by"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,create_date:0
+msgid "Created on"
+msgstr "Created on"
+
+#. module: l10n_br_hr_backup
+#: field:hr.payroll.structure,last_backup:0
+#: field:hr.salary.rule,last_backup:0
+#: field:hr.salary.rule.category,last_backup:0
+msgid "Data do ultimo backup"
+msgstr "Data do ultimo backup"
+
+#. module: l10n_br_hr_backup
+#: view:hr.salary.rule:l10n_br_hr_backup.l10n_br_hr_backup_hr_salary_rule_form_view
+msgid "Description"
+msgstr "Descrição"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,display_name:0
+msgid "Display Name"
+msgstr "Display Name"
+
+#. module: l10n_br_hr_backup
+#: view:hr.payroll.structure:l10n_br_hr_backup.l10n_br_hr_backup_hr_payroll_structure
+#: view:hr.salary.rule:l10n_br_hr_backup.l10n_br_hr_backup_hr_salary_rule_form_view
+msgid "Generate XML"
+msgstr "Generate XML"
+
+#. module: l10n_br_hr_backup
+#: view:hr.backup:l10n_br_hr_backup.view_l10n_br_hr_backup
+#: model:ir.actions.act_window,name:l10n_br_hr_backup.action_hr_backup
+#: model:ir.ui.menu,name:l10n_br_hr_backup.menu_hr_backup
+msgid "HR Backup"
+msgstr "HR Backup"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,id:0
+msgid "ID"
+msgstr "ID"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,__last_update:0
+msgid "Last Modified on"
+msgstr "Last Modified on"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,write_uid:0
+msgid "Last Updated by"
+msgstr "Last Updated by"
+
+#. module: l10n_br_hr_backup
+#: field:hr.backup,write_date:0
+msgid "Last Updated on"
+msgstr "Last Updated on"
+
+#. module: l10n_br_hr_backup
+#: view:hr.backup:l10n_br_hr_backup.view_l10n_br_hr_backup
+msgid "Return"
+msgstr "Return"
+
+#. module: l10n_br_hr_backup
+#: model:ir.model,name:l10n_br_hr_backup.model_hr_salary_rule_category
+msgid "Salary Rule Category"
+msgstr "Categoria de Regras de Salário"
+
+#. module: l10n_br_hr_backup
+#: view:hr.payroll.structure:l10n_br_hr_backup.l10n_br_hr_backup_hr_payroll_structure
+msgid "Salary Rules"
+msgstr "Regras de Salários"
+
+#. module: l10n_br_hr_backup
+#: model:ir.model,name:l10n_br_hr_backup.model_hr_payroll_structure
+msgid "Salary Structure"
+msgstr "Estrutura do Salário"
+
+#. module: l10n_br_hr_backup
+#: view:hr.payroll.structure:l10n_br_hr_backup.l10n_br_hr_backup_hr_payroll_structure
+#: view:hr.salary.rule:l10n_br_hr_backup.l10n_br_hr_backup_hr_salary_rule_form_view
+msgid "XML"
+msgstr "XML"
+
+#. module: l10n_br_hr_backup
+#: field:hr.payroll.structure,generate_xml:0
+#: field:hr.salary.rule,generate_xml:0
+#: field:hr.salary.rule.category,generate_xml:0
+msgid "XML da rubrica gerado automaticamente"
+msgstr "XML da rubrica gerado automaticamente"
+
