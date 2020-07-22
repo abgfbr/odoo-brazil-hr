@@ -1135,8 +1135,13 @@ class HrPayslip(models.Model):
 
         base_total = BASE_INSS + inss_outros_vinculos.get('base')
 
+        calculo_progressivo = True
+
+        if self.contract_id.categoria_sefip in ['05', '11']:
+            calculo_progressivo = False
+
         inss_total, reference = tabela_inss_obj._compute_inss(
-            base_total, self.date_from)
+            base_total, self.date_from, calculo_progressivo)
 
         inss = inss_total - inss_outros_vinculos.get('inss')
 

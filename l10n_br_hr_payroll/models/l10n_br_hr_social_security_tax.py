@@ -88,9 +88,12 @@ class L10nBrHrSocialTax(models.Model):
         """
         return any(tabela_vigente.mapped('calculo_progressivo'))
 
-    def _compute_inss(self, BASE_INSS, date_from):
+    def _compute_inss(self, BASE_INSS, date_from, calculo_progressivo=True):
         ano = fields.Datetime.from_string(date_from).year
-        tabela_vigente = self.find(date_from)
+        tabela_vigente = self.search([
+            ('year', '=', ano),
+            ('calculo_progressivo', '=', calculo_progressivo)
+        ])
         inss = 0
 
         if not tabela_vigente:
