@@ -69,7 +69,7 @@ class HrPayslip(models.Model):
                 liquido = sum(holerite.line_ids.filtered(
                     lambda x: x.code == 'LIQUIDO').mapped('total'))
                 if liquido and float_compare(
-                        holerite.total_folha, liquido, precision_rounding=0.1):
+                        holerite.total_folha, liquido, precision_rounding=0.01):
                     raise exceptions.Warning(
                         _('Rúbrica LIQUIDO com valor inválido!'))
 
