@@ -3345,7 +3345,7 @@ class HrPayslip(models.Model):
             for holerite in holerites:
                 for line in holerite.line_ids:
                     if line.code in [
-                        'PENSAO_ALIMENTICIA',
+                        'PENSAO_ALIMENTICIA', 'PENSAO_ALIMENTICIA_PORCENTAGEM'
                     ]:
                         if not (self.tipo_de_folha == 'ferias'
                                 and holerite.mes_do_ano == self.mes_do_ano):
