@@ -53,6 +53,7 @@ class HrPayslip(models.Model):
     @api.multi
     def hr_verify_sheet(self):
         for holerite in self:
+            holerite.verify_list_rubricas_estrutura_holerite()
             if holerite.state == 'draft':
                 holerite.write({'state': 'verify'})
 
@@ -3352,3 +3353,43 @@ class HrPayslip(models.Model):
                             valor += line.total
 
         return valor
+
+    @api.multi
+    def get_list_codigo_rubricas_especificas(self):
+        for record in self:
+            rubricas = []
+            for rubrica_especifica in record.contract_id.specific_rule_ids:
+                if not rubrica_especifica.date_stop:
+                    if rubrica_especifica.rule_id.code != "SALARIO":
+                        rubricas.append(rubrica_especifica.rule_id.code)
+
+            return set(rubricas)
+
+    @api.multi
+    def get_list_rubricas_calculadas(self):
+        for record in self:
+            rubricas = []
+            for rubrica in record.line_ids:
+                rubricas.append(rubrica.code)
+
+            return set(sorted(rubricas))
+
+    @api.multi
+    def verify_list_rubricas_estrutura_holerite(self):
+        for record in self:
+            estrutura_lista_rubricas = \
+                record.struct_id.get_lista_rubricas_estrutura()
+            holerite_lista_rubricas = \
+                record.get_list_rubricas_calculadas() - \
+                record.get_list_codigo_rubricas_especificas()
+
+            rubricas_estrutura_restantes = estrutura_lista_rubricas - \
+                holerite_lista_rubricas
+
+            if len(rubricas_estrutura_restantes) > 0:
+                raise exceptions.Warning(
+                    "Está(ão) faltando alguma(s) rubrica(s) no holerite que é "
+                    "necessária na estrutura de salário! Por favor "
+                    "recalcular o holerite! - Rubicas: {}".format(
+                        rubricas_estrutura_restantes)
+                )
