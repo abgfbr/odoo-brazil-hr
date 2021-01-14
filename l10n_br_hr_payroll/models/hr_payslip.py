@@ -1145,7 +1145,7 @@ class HrPayslip(models.Model):
 
         inss = inss_total - inss_outros_vinculos.get('inss')
 
-        return inss, reference
+        return inss.quantize(Decimal('.01'), rounding='ROUND_DOWN'), reference
 
     @profile
     def BASE_IRRF(self, TOTAL_IRRF, INSS):
