@@ -185,6 +185,9 @@ def totalizadores_linhas_holerites(payslip_lines, payslip_autonomo_ids=[]):
         if rubrica['code'] in ['LIC_MATERNIDADE', 'LIC_MATERNIDADE_13']:
             licenca_maternidade_deducao = rubrica['sum']
 
+        if rubrica['code'] in ['LIC_MATERNIDADE_M_ANT']:
+            licenca_maternidade_deducao += rubrica['sum']
+
     # INSS dos autonomos
     for slip_id in payslip_autonomo_ids:
         for line_id in slip_id.line_ids:
