@@ -93,10 +93,16 @@ class HrContribuicaoInssVinculos(models.Model):
             valor_aliquota = 0
 
             if record.period_id and record.valor_remuneracao_vinculo:
+                calculo_progressivo = False
+                if record.period_id.date_start > '2020-01-01':
+                    calculo_progressivo = True
+                    if record.contrato_id.categoria_sefip in ['05', '11']:
+                        calculo_progressivo = False
                 valor_aliquota, reference = \
                     self.env['l10n_br.hr.social.security.tax']._compute_inss(
                         record.valor_remuneracao_vinculo,
-                        record.period_id.date_start
+                        record.period_id.date_start,
+                        calculo_progressivo
                     )
 
             record.valor_alicota_vinculo = valor_aliquota

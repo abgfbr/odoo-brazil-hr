@@ -2,7 +2,7 @@
 # Copyright (C) 2016 KMEE (http://www.kmee.com.br)
 # License AGPL-3 - See http://www.gnu.org/licenses/agpl-3.0.html
 
-from openerp import fields, models
+from openerp import api, fields, models
 
 TIPO_SAQUE = (
     ('01', u'01 - Sem justa causa (incl. indireta)'),
@@ -222,3 +222,17 @@ class HrPayrollStructure(models.Model):
     children_ids = fields.One2many(
         copy=False
     )
+
+    @api.multi
+    def get_lista_rubricas_estrutura(self):
+        rubricas = []
+        estrutura_atual = self
+
+        while estrutura_atual:
+            for rubrica in estrutura_atual.rule_ids:
+                if rubrica.code not in [u'IRPF_PROPORCIONAL_FERIAS', u'REF_VALOR_VALE', u'PAGAMENTO_FERIAS']:
+                    rubricas.append(rubrica.code)
+
+            estrutura_atual = estrutura_atual.parent_id
+
+        return set(sorted(rubricas))
