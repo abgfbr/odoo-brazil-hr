@@ -99,11 +99,11 @@ class HrHolidays(models.Model):
                         date_from = fields.Date.from_string(record.date_from)
                         if resource_calendar_obj.quantidade_dias_uteis(
                                 date_from, date_to) > \
-                                record.holiday_status_id.days_limit:
+                                record.holiday_status_id.days_limit and self.contrato_id.labor_regime_id.id not in [self.env.ref("l10n_br_hr_contract.labor_regime_est").id, self.env.ref("l10n_br_hr_contract.labor_regime_rju").id]:
                             raise UserError(_("Number of days exceeded!"))
                     if record.holiday_status_id.type_day == u'corridos':
                         if record.number_of_days_temp > \
-                                record.holiday_status_id.days_limit:
+                                record.holiday_status_id.days_limit and self.contrato_id.labor_regime_id.id not in [self.env.ref("l10n_br_hr_contract.labor_regime_est").id, self.env.ref("l10n_br_hr_contract.labor_regime_rju").id]:
                             raise UserError(_("Number of days exceeded!"))
                 # Validar Limite de Horas
                 # if record.holiday_status_id.hours_limit:
