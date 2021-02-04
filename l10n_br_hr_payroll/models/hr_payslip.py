@@ -3372,6 +3372,14 @@ class HrPayslip(models.Model):
             for rubrica in record.line_ids:
                 rubricas.append(rubrica.code)
 
+            if record.tipo_de_folha == "provisao_decimo_terceiro":
+                rubricas.append("DESCONTO_ADIANTAMENTO_13")
+                rubricas.append("INSS_EMPRESA_F_FERIAS")
+                rubricas.append("BASE_IRPF_PROPORCIONAL_FERIAS")
+
+            if record.tipo_de_folha == "provisao_ferias":
+                rubricas.append("IRPF_FERIAS")
+
             return set(sorted(rubricas))
 
     @api.multi
