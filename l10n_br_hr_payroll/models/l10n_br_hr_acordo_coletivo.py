@@ -3,6 +3,8 @@
 # License AGPL-3 - See http://www.gnu.org/licenses/agpl-3.0.html
 
 from openerp import api, models, fields
+from openerp.exceptions import Warning
+
 
 TIPO_ACORDOS = [
     ('A', 'Acordo Coletivo de Trabalho'),
@@ -72,6 +74,21 @@ class L10nBrHrAcordoColetivo(models.Model):
         inverse_name='acordo_coletivo_id'
     )
 
+    faixa_ids = fields.One2many(
+        string="Faixas Saláriais",
+        comodel_name="l10n.br.hr.acordo.coletivo.faixas",
+        inverse_name="acordo_coletivo_id"
+    )
+
+    tipo_reajuste = fields.Selection(
+        string="Tipo de Reajuste",
+        selection=[
+            ("fixo", "Fixo"),
+            ("faixas", "Faixas Salariais"),
+        ],
+        default="fixo"
+    )
+
     @api.multi
     def _compute_name(self):
         for record in self:
@@ -103,7 +120,6 @@ class L10nBrHrAcordoColetivo(models.Model):
     @api.multi
     def _get_diferencas_retroativas(self):
         for record in self:
-
             if not record.periodo_ids:
                 record._get_periodos_retroativos()
 
@@ -119,38 +135,74 @@ class L10nBrHrAcordoColetivo(models.Model):
                     payslip_ids = self.env['hr.payslip'].search(
                         [('date_from', '>=', periodo.date_start),
                          ('date_from', '<=', periodo.date_stop),
-                         ('tipo_de_folha', 'in', ['normal', 'ferias']),
+                         ('tipo_de_folha', 'in', ['normal']),
                          ('contract_id', '=', contrato.id)]
                     )
 
                     for payslip in payslip_ids:
+                        salario_base = payslip.input_line_ids.filtered(
+                            lambda v: v.code == "SALARIO_MES").amount
                         for line in payslip.line_ids:
-                            if rubricas.get(line.salary_rule_id.id):
+                            if rubricas.get(line.salary_rule_id.id) and line.total:
                                 record._gerar_linha_acordo_coletivo(
                                     contrato, line, periodo,
                                     record.competencia_pagamento,
-                                    rubricas[line.salary_rule_id.id]
+                                    rubricas[line.salary_rule_id.id],
+                                    salario_base
                                 )
 
     def _gerar_linha_acordo_coletivo(
-            self, contrato, line, periodo, competencia_pagamento, rubrica_id):
-        valor_bruto = line.total
-        porcentagem = 1 + (self.valor_reajuste_salarial / 100)
-        valor_diferenca = (valor_bruto * porcentagem) - valor_bruto
-        vals = {
-            'contract_id': contrato.id,
-            'rule_id': rubrica_id,
-            'tipo_holerite': 'normal',
-            'date_start': competencia_pagamento.date_start,
-            'date_stop': competencia_pagamento.date_stop,
-            'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
-            'specific_quantity': 1,
-            'specific_percentual': 100,
-            'specific_amount': valor_diferenca,
-            'acordo_coletivo_id': self.id,
-        }
+            self, contrato, line, periodo, competencia_pagamento, rubrica_id,
+            salario_base):
 
-        self.env['hr.contract.salary.rule'].create(vals)
+        valor_bruto = line.total
+        porcentagem = 0
+        valor_diferenca = 0
+
+        if self.tipo_reajuste == "fixo":
+            porcentagem = 1 + (self.valor_reajuste_salarial / 100)
+            valor_diferenca = (valor_bruto * porcentagem) - valor_bruto
+            vals = {
+                'contract_id': contrato.id,
+                'rule_id': rubrica_id,
+                'tipo_holerite': 'normal',
+                'date_start': competencia_pagamento.date_start,
+                'date_stop': competencia_pagamento.date_stop,
+                'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
+                'specific_quantity': 1,
+                'specific_percentual': 100,
+                'specific_amount': valor_diferenca,
+                'acordo_coletivo_id': self.id,
+            }
+
+            self.env['hr.contract.salary.rule'].create(vals)
+        elif self.tipo_reajuste == "faixas":
+            for faixa in self.faixa_ids:
+                porcentagem = 1 + (faixa.porcentagem / 100)
+                valor_base = 0
+                if faixa.teto == 0:
+                    valor_base = salario_base - faixa.piso
+                else:
+                    valor_base = faixa.teto - faixa.piso
+
+                valor_proporcional_base = round(valor_base / salario_base)
+                proporcao_antiga = valor_bruto * valor_proporcional_base
+                valor_diferenca += (proporcao_antiga * porcentagem) - proporcao_antiga
+
+            vals = {
+                'contract_id': contrato.id,
+                'rule_id': rubrica_id,
+                'tipo_holerite': 'normal',
+                'date_start': competencia_pagamento.date_start,
+                'date_stop': competencia_pagamento.date_stop,
+                'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
+                'specific_quantity': 1,
+                'specific_percentual': 100,
+                'specific_amount': valor_diferenca,
+                'acordo_coletivo_id': self.id,
+            }
+
+            self.env['hr.contract.salary.rule'].create(vals)
 
     @api.multi
     def buscar_periodos_retroativos(self):
@@ -160,7 +212,12 @@ class L10nBrHrAcordoColetivo(models.Model):
     @api.multi
     def gerar_diferencas_retroativos(self):
         for record in self:
-            record._get_diferencas_retroativas()
+            if record.periodo_ids:
+                record._get_diferencas_retroativas()
+            else:
+                raise Warning(
+                    "É preciso primeiro buscar os períodos retroativos!"
+                )
 
 
 class L10nBrHrAcordoColetivoRubrias(models.Model):
@@ -177,4 +234,22 @@ class L10nBrHrAcordoColetivoRubrias(models.Model):
     acordo_coletivo_id = fields.Many2one(
         string='Acordo Coletivo',
         comodel_name='l10n.br.hr.acordo.coletivo',
+    )
+
+
+class L10nBrHrAcordoColetivoFaixas(models.Model):
+    _name = "l10n.br.hr.acordo.coletivo.faixas"
+    _order = "piso ASC"
+
+    acordo_coletivo_id = fields.Many2one(
+        string="Acordo Coletivo",
+    )
+    piso = fields.Float(
+        string="Piso",
+    )
+    teto = fields.Float(
+        string="Teto",
+    )
+    porcentagem = fields.Float(
+        string="Porcentagem",
     )
