@@ -17,16 +17,28 @@
                                 <field name="name" readonly="1" />
                             </h1>
                         </div>
-                        <group>
-                            <field name="data_assinatura_acordo" required="True"/>
-                            <field name="tipo_acordo" required="True"/>
-                            <field name="competencia_pagamento" required="True"/>
-                            <field name="data_efetivacao" required="True"/>
-                            <field name="descricao" required="True"/>
-                            <field name="remuneracao_relativa_sucessao" required="True"/>
-                            <field name="valor_reajuste_salarial" required="True"/>
 
+                        <group>
+                            <field name="data_assinatura_acordo"/>
+                            <field name="tipo_acordo"/>
+                            <field name="competencia_pagamento"/>
+                            <field name="data_efetivacao"/>
+                            <field name="descricao"/>
+                            <field name="remuneracao_relativa_sucessao"/>
+                            <field name="tipo_reajuste"/>
+                            <field name="valor_reajuste_salarial" attrs="{'invisible': [('tipo_reajuste', '!=', 'fixo')]}"/>
                         </group>
+
+                        <group string="Rúbricas" attrs="{'invisible': [('tipo_reajuste', '!=', 'faixas')]}">
+                            <field name="faixa_ids" nolabel="1">
+                                <tree string="Faixas" editable="bottom">
+                                    <field name="piso"/>
+                                    <field name="teto"/>
+                                    <field name="porcentagem"/>
+                                </tree>
+                            </field>
+                        </group>
+
                         <separator string="Rúbricas"/>
                         <field name="rubrica_ids" widget="one2many_list">
                             <tree string="Rúbricas" duplicate="false" editable="bottom">

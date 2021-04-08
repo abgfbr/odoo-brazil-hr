@@ -4,7 +4,7 @@
 
 
 <openerp>
-    <data>
+    <data noupdate="1">
 
         <record id="l10n_br_hr_income_tax_deductable_amount_family_2017" model="l10n_br.hr.income.tax.deductable.amount.family">
             <field name="year">2017</field>

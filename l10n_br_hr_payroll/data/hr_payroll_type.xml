@@ -3,7 +3,7 @@
      License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
 
 <openerp>
-    <data>
+    <data noupdate="1">
 
         <record id="hr_payroll_type_normal" model="hr.payroll.type">
             <field name="name">normal</field>

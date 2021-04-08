@@ -3,7 +3,7 @@
      License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
 
 <openerp>
-    <data>
+    <data noupdate="1">
         <!-- Regras de Imposto de Renda -->
 
         <!--<record id="hr_salary_rule_imp_renda_075p" model="hr.salary.rule">-->

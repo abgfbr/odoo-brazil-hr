@@ -3,7 +3,7 @@
      License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
 
 <openerp>
-    <data>
+    <data noupdate="1">
         
        <!--RAT/FAP 2017-->
         <record id="l10n_br_hr_rat_fap_2017" model="l10n_br.hr.rat.fap">
