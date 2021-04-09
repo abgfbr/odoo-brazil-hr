@@ -19,18 +19,19 @@
                         </div>
 
                         <group>
-                            <field name="data_assinatura_acordo"/>
-                            <field name="tipo_acordo"/>
-                            <field name="competencia_pagamento"/>
-                            <field name="data_efetivacao"/>
+                            <field name="data_assinatura_acordo" required="True"/>
+                            <field name="tipo_acordo" required="True"/>
+                            <field name="competencia_pagamento" required="True"/>
+                            <field name="data_efetivacao" required="True"/>
                             <field name="descricao"/>
                             <field name="remuneracao_relativa_sucessao"/>
-                            <field name="tipo_reajuste"/>
-                            <field name="valor_reajuste_salarial" attrs="{'invisible': [('tipo_reajuste', '!=', 'fixo')]}"/>
+                            <field name="tipo_reajuste" required="True"/>
+                            <field name="valor_reajuste_salarial" attrs="{'invisible': [('tipo_reajuste', '!=', 'fixo')], 'required': [('tipo_reajuste', '=', 'fixo')]}"/>
                         </group>
 
-                        <group string="Rúbricas" attrs="{'invisible': [('tipo_reajuste', '!=', 'faixas')]}">
-                            <field name="faixa_ids" nolabel="1">
+                        <group string="Faixas Saláriais" attrs="{'invisible': [('tipo_reajuste', '!=', 'faixas')]}" col="6">
+                            <label string='Para determinar que o teto da última faixa seja o valor total do salário basta adicionar o valor de "0".' colspan="4"/>
+                            <field name="faixa_ids" nolabel="1" colspan="4">
                                 <tree string="Faixas" editable="bottom">
                                     <field name="piso"/>
                                     <field name="teto"/>
@@ -127,7 +128,7 @@
                   sequence="7"
                   action="l10n_br_hr_acordo_coletivo_action"
                   parent="hr.menu_hr_main"
-                  groups="base.group_no_one"
+                  groups="base.group_hr_user"
         />
 
         <record model="ir.ui.view" id="l10n_br_hr_acordo_coletivo_rubricas_tree">

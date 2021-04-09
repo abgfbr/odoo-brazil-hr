@@ -212,6 +212,11 @@ class L10nBrHrAcordoColetivo(models.Model):
     @api.multi
     def gerar_diferencas_retroativos(self):
         for record in self:
+            if record.tipo_reajuste == "faixas" and not record.faixa_ids:
+                raise Warning(
+                    "É preciso definiar as faixas de reajuste de salário!"
+                )
+
             if record.periodo_ids:
                 record._get_diferencas_retroativas()
             else:
