@@ -185,7 +185,7 @@ class L10nBrHrAcordoColetivo(models.Model):
                 else:
                     valor_base = faixa.teto - faixa.piso
 
-                valor_proporcional_base = round(valor_base / salario_base)
+                valor_proporcional_base = valor_base/salario_base
                 proporcao_antiga = valor_bruto * valor_proporcional_base
                 valor_diferenca += (proporcao_antiga * porcentagem) - proporcao_antiga
 
