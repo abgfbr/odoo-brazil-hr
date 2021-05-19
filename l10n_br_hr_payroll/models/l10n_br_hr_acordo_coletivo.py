@@ -143,13 +143,32 @@ class L10nBrHrAcordoColetivo(models.Model):
                         salario_base = payslip.input_line_ids.filtered(
                             lambda v: v.code == "SALARIO_MES").amount
                         for line in payslip.line_ids:
-                            if rubricas.get(line.salary_rule_id.id) and line.total:
+                            if rubricas.get(line.salary_rule_id.id) and line.total and line.code not in ("FERIAS_FERIAS", "1/3_FERIAS_FERIAS", "ABONO_PECUNIARIO_FERIAS", "1/3_ABONO_PECUNIARIO_FERIAS"):
                                 record._gerar_linha_acordo_coletivo(
                                     contrato, line, periodo,
                                     record.competencia_pagamento,
                                     rubricas[line.salary_rule_id.id],
                                     salario_base
                                 )
+
+                ferias_mes_corrente = self.env['hr.payslip'].search(
+                    [('date_from', '>=', self.data_efetivacao),
+                     ('tipo_de_folha', 'in', ['ferias']),
+                     ('contract_id', '=', contrato.id),
+                     ('state', '=', 'done')]
+                )
+
+                for payslip in ferias_mes_corrente:
+                    salario_base = payslip.input_line_ids.filtered(
+                        lambda v: v.code == "SALARIO_MES").amount
+                    for line in payslip.line_ids:
+                        if rubricas.get(line.salary_rule_id.id) and line.total:
+                            record._gerar_linha_acordo_coletivo(
+                                contrato, line, self.competencia_pagamento,
+                                record.competencia_pagamento,
+                                rubricas[line.salary_rule_id.id],
+                                salario_base
+                            )
 
     def _gerar_linha_acordo_coletivo(
             self, contrato, line, periodo, competencia_pagamento, rubrica_id,
@@ -159,35 +178,14 @@ class L10nBrHrAcordoColetivo(models.Model):
         porcentagem = 0
         valor_diferenca = 0
 
-        if self.tipo_reajuste == "fixo":
-            porcentagem = 1 + (self.valor_reajuste_salarial / 100)
-            valor_diferenca = (valor_bruto * porcentagem) - valor_bruto
-            vals = {
-                'contract_id': contrato.id,
-                'rule_id': rubrica_id,
-                'tipo_holerite': 'normal',
-                'date_start': competencia_pagamento.date_start,
-                'date_stop': competencia_pagamento.date_stop,
-                'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
-                'specific_quantity': 1,
-                'specific_percentual': 100,
-                'specific_amount': valor_diferenca,
-                'acordo_coletivo_id': self.id,
-            }
+        if contrato.category_id.id == self.env.ref("l10n_br_hr_payroll.hr_contract_category_410").id:
+            diferenca_salarios_proporcional = \
+                (contrato.wage - salario_base) / salario_base
 
-            self.env['hr.contract.salary.rule'].create(vals)
-        elif self.tipo_reajuste == "faixas":
-            for faixa in self.faixa_ids:
-                porcentagem = 1 + (faixa.porcentagem / 100)
-                valor_base = 0
-                if faixa.teto == 0:
-                    valor_base = salario_base - faixa.piso
-                else:
-                    valor_base = faixa.teto - faixa.piso
+            diferenca_salarios_proporcional += 1
 
-                valor_proporcional_base = valor_base/salario_base
-                proporcao_antiga = valor_bruto * valor_proporcional_base
-                valor_diferenca += (proporcao_antiga * porcentagem) - proporcao_antiga
+            novo_valor = \
+                (valor_bruto * diferenca_salarios_proporcional) - valor_bruto
 
             vals = {
                 'contract_id': contrato.id,
@@ -198,11 +196,110 @@ class L10nBrHrAcordoColetivo(models.Model):
                 'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
                 'specific_quantity': 1,
                 'specific_percentual': 100,
-                'specific_amount': valor_diferenca,
+                'specific_amount': novo_valor,
                 'acordo_coletivo_id': self.id,
             }
 
             self.env['hr.contract.salary.rule'].create(vals)
+        elif line.code == "SALARIO_SUBST":
+            salario_antigo_gerente = \
+                contrato.gerente_id.contract_id.change_salary_ids.filtered(
+                    lambda v: v.change_reason_id.id == 3)[1].wage
+            salario_atual_gerente = contrato.gerente_id.contract_id.wage
+
+            diferenca_salarial_antiga = salario_antigo_gerente - salario_base
+            diferenca_salarial_atual = salario_atual_gerente - contrato.wage
+
+            proporcao_salario_antigo = valor_bruto / diferenca_salarial_antiga
+
+            salario_substituicao_atual = \
+                proporcao_salario_antigo * diferenca_salarial_atual
+
+            diferenca_salario_substituicao_retro = \
+                salario_substituicao_atual - valor_bruto
+
+            vals = {
+                'contract_id': contrato.id,
+                'rule_id': rubrica_id,
+                'tipo_holerite': 'normal',
+                'date_start': competencia_pagamento.date_start,
+                'date_stop': competencia_pagamento.date_stop,
+                'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
+                'specific_quantity': 1,
+                'specific_percentual': 100,
+                'specific_amount': diferenca_salario_substituicao_retro,
+                'acordo_coletivo_id': self.id,
+            }
+
+            self.env['hr.contract.salary.rule'].create(vals)
+        else:
+            substituicao_ferias = False
+            if line.slip_id.tipo_de_folha == "ferias":
+                substituicao_ferias = line.slip_id.line_ids.filtered(
+                    lambda x: x.code == "MEDIA_SALARIO_FERIAS" and x.total)
+
+            if not substituicao_ferias:
+                if self.tipo_reajuste == "fixo":
+                    porcentagem = 1 + (self.valor_reajuste_salarial / 100)
+                    valor_diferenca = (valor_bruto * porcentagem) - valor_bruto
+                    vals = {
+                        'contract_id': contrato.id,
+                        'rule_id': rubrica_id,
+                        'tipo_holerite': 'normal',
+                        'date_start': competencia_pagamento.date_start,
+                        'date_stop': competencia_pagamento.date_stop,
+                        'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
+                        'specific_quantity': 1,
+                        'specific_percentual': 100,
+                        'specific_amount': valor_diferenca,
+                        'acordo_coletivo_id': self.id,
+                    }
+
+                    self.env['hr.contract.salary.rule'].create(vals)
+                elif self.tipo_reajuste == "faixas":
+                    for faixa in self.faixa_ids:
+                        porcentagem = 1 + (faixa.porcentagem / 100)
+                        valor_base = 0
+                        if faixa.teto == 0:
+                            valor_base = salario_base - faixa.piso
+                        else:
+                            valor_base = faixa.teto - faixa.piso
+
+                        valor_proporcional_base = valor_base/salario_base
+                        proporcao_antiga = valor_bruto * valor_proporcional_base
+                        valor_diferenca += (proporcao_antiga * porcentagem) - proporcao_antiga
+
+                    vals = {
+                        'contract_id': contrato.id,
+                        'rule_id': rubrica_id,
+                        'tipo_holerite': 'normal',
+                        'date_start': competencia_pagamento.date_start,
+                        'date_stop': competencia_pagamento.date_stop,
+                        'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
+                        'specific_quantity': 1,
+                        'specific_percentual': 100,
+                        'specific_amount': valor_diferenca,
+                        'acordo_coletivo_id': self.id,
+                    }
+
+                    self.env['hr.contract.salary.rule'].create(vals)
+            else:
+                valor_diferenca = (valor_bruto * 1.030232393) - valor_bruto
+
+                vals = {
+                    'contract_id': contrato.id,
+                    'rule_id': rubrica_id,
+                    'tipo_holerite': 'normal',
+                    'date_start': competencia_pagamento.date_start,
+                    'date_stop': competencia_pagamento.date_stop,
+                    'ref': '{}-{}'.format(periodo.code[3:], periodo.code[:2]),
+                    'specific_quantity': 1,
+                    'specific_percentual': 100,
+                    'specific_amount': valor_diferenca,
+                    'acordo_coletivo_id': self.id,
+                }
+
+                self.env['hr.contract.salary.rule'].create(vals)
 
     @api.multi
     def buscar_periodos_retroativos(self):
