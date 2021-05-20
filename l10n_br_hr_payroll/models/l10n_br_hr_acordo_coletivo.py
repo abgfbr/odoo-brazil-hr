@@ -159,12 +159,15 @@ class L10nBrHrAcordoColetivo(models.Model):
                 )
 
                 for payslip in ferias_mes_corrente:
+                    periodo = self.env["account.period"].search([
+                        ("code", "=", "{}/{}".format("{0:02d}".format(payslip.mes_do_ano), payslip.ano)),
+                    ])
                     salario_base = payslip.input_line_ids.filtered(
                         lambda v: v.code == "SALARIO_MES").amount
                     for line in payslip.line_ids:
                         if rubricas.get(line.salary_rule_id.id) and line.total:
                             record._gerar_linha_acordo_coletivo(
-                                contrato, line, self.competencia_pagamento,
+                                contrato, line, periodo,
                                 record.competencia_pagamento,
                                 rubricas[line.salary_rule_id.id],
                                 salario_base
