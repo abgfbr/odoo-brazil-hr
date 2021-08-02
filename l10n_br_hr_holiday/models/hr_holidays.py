@@ -95,8 +95,8 @@ class HrHolidays(models.Model):
                 if record.holiday_status_id.days_limit:
                     if record.holiday_status_id.type_day == u'uteis':
                         resource_calendar_obj = self.env['resource.calendar']
-                        date_to = fields.Date.from_string(record.date_to)
-                        date_from = fields.Date.from_string(record.date_from)
+                        date_to = fields.Date.from_string(record.data_inicio)
+                        date_from = fields.Date.from_string(record.data_fim)
                         if resource_calendar_obj.quantidade_dias_uteis(
                                 date_from, date_to) > \
                                 record.holiday_status_id.days_limit and self.contrato_id.labor_regime_id.id not in [self.env.ref("l10n_br_hr_contract.labor_regime_est").id, self.env.ref("l10n_br_hr_contract.labor_regime_rju").id]:
