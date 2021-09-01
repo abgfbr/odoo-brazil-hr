@@ -74,7 +74,8 @@ class L10nBrHrPayslip(models.Model):
         Processa a contabilização do lote baseado nas rubricas dos holerites
         """
         for lote in self:
-
+            if lote.account_event_id and lote.account_event_id.state != 'open':
+                continue
             # Exclui o Evento Contábbil
             lote.account_event_id.unlink()
 

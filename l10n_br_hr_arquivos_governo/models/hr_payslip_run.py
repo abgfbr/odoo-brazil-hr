@@ -292,6 +292,8 @@ class HrPayslipRun(models.Model):
         for boleto_id in self.boletos_ids:
             boleto_id.unlink()
 
+        self.verificar_holerites_gerados()
+
         for record in self:
 
             created_ids = []
