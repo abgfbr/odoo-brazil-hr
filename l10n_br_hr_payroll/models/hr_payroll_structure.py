@@ -230,7 +230,11 @@ class HrPayrollStructure(models.Model):
 
         while estrutura_atual:
             for rubrica in estrutura_atual.rule_ids:
-                if rubrica.code not in [u'IRPF_PROPORCIONAL_FERIAS', u'REF_VALOR_VALE', u'PAGAMENTO_FERIAS']:
+                rubrica_condicao_especial = rubrica.condition_select != "none"
+
+                if rubrica.code not in [
+                    u'IRPF_PROPORCIONAL_FERIAS', u'REF_VALOR_VALE',
+                        u'PAGAMENTO_FERIAS'] and not rubrica_condicao_especial:
                     rubricas.append(rubrica.code)
 
             estrutura_atual = estrutura_atual.parent_id
