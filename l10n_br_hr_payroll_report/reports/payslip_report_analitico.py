@@ -83,6 +83,24 @@ def process_data_format(data):
             data[line].terceiros = format_money_mask(data[line].terceiros)
             data[line].total = format_money_mask(data[line].total)
             continue
+        if line == 'totalizadores_holerites':
+            data[line].total_proventos = format_money_mask(
+                data[line].total_proventos)
+            data[line].total_descontos = format_money_mask(
+                data[line].total_descontos
+            )
+            data[line].total_liquido = format_money_mask(
+                data[line].total_liquido
+            )
+        if line == 'totalizadores_rescisoes':
+            data[line].total_proventos = format_money_mask(
+                data[line].total_proventos)
+            data[line].total_descontos = format_money_mask(
+                data[line].total_descontos
+            )
+            data[line].total_liquido = format_money_mask(
+                data[line].total_liquido
+            )
         if line == 'proventos':
             for line_proventos in data[line]:
                 line_proventos.sum = format_money_mask(line_proventos.sum)

@@ -220,6 +220,8 @@ class HrPayslipRun(models.Model):
             for payslip in payslips:
                 if payslip.contract_id.id not in contratos_com_holerites:
                     contratos_com_holerites.append(payslip.contract_id.id)
+                if not payslip.payslip_run_id:
+                    payslip.payslip_run_id = lote.id
 
             contratos_sem_holerite = []
             for contrato in contracts_id:
@@ -337,11 +339,11 @@ class HrPayslipRun(models.Model):
                         self.env.cr.commit()
                         _logger.info(u"Holerite " + contrato.display_name +
                                      u" processado com sucesso!")
-                    except:
-                        _logger.warning(u"Holerite " + contrato.display_name +
-                                        u" falhou durante o cálculo!")
-                        payslip.unlink()
-                        return
+                    except Exception as e:
+                        _logger.warning(
+                            u"Holerite {} falhou durante o cálculo! Erro: {}".format(contrato.display_name, e.message)
+                        )
+
             contrato.action_button_update_controle_ferias()
             self.env.cr.commit()
         else:
@@ -383,12 +385,11 @@ class HrPayslipRun(models.Model):
                     u"Holerite " + contrato.display_name +
                     u" processado com sucesso!")
                 self.env.cr.commit()
-            except:
+            except Exception as e:
                 _logger.warning(
-                    u"Holerite " + contrato.display_name +
-                    u" falhou durante o cálculo!")
-                payslip.unlink()
-                return
+                    u"Holerite {} falhou durante o cálculo! Erro: {}".format(
+                        contrato.display_name, e.message)
+                )
 
     @api.multi
     def busca_holerite_orfao(self):
