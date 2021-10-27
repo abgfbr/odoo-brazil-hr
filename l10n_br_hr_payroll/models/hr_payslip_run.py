@@ -322,6 +322,7 @@ class HrPayslipRun(models.Model):
                     formata_data(periodo.fim_aquisitivo)
 
                 payslip_with_periodo = self.env['hr.payslip'].search([
+                    ('contract_id', '=', contrato.id),
                     ('periodo_aquisitivo_provisao', '=', periodo_aquisitivo_provisao),
                     ('tipo_de_folha', '=', 'provisao_ferias'),
                     ('mes_do_ano', '=', self.mes_do_ano),
