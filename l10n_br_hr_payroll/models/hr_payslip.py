@@ -3344,6 +3344,11 @@ class HrPayslip(models.Model):
         valor = 0
         if holerites:
             for holerite in holerites:
+                if holerite.tipo_de_folha == 'ferias':
+                    adiantamento_13_ferias = holerite.line_ids.filtered(
+                        lambda x: x.code == 'ADIANTAMENTO_13')
+                    if not adiantamento_13_ferias or adiantamento_13_ferias.total == 0:
+                        continue
                 for line in holerite.line_ids:
                     if line.code in [
                         'PENSAO_ALIMENTICIA', 'PENSAO_ALIMENTICIA_PORCENTAGEM'
