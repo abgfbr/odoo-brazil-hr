@@ -80,13 +80,19 @@ class HrPayslip(models.Model):
         # Montar a base tribuavel de ferias
         ferias = [
             'FERIAS', '1/3_FERIAS', '1/3_FERIAS_S_ONUS',
-            'DIF_MEDIA_SALARIO_FERIAS', '1/3_DIF_MEDIA_SUBSTITUICAO_FERIAS'
         ]
         base_ferias = sum(self.line_ids.filtered(
             lambda x: x.code in ferias).mapped('total')) or 0
 
+        medias_ferias = [
+            'DIF_MEDIA_SALARIO_FERIAS', '1/3_DIF_MEDIA_SUBSTITUICAO_FERIAS'
+        ]
+
+        valor_medias_ferias = sum(self.line_ids.filtered(
+            lambda x: x.code in medias_ferias).mapped('total')) or 0
+
         # Definir BASE bruta do IR
-        self.rendimentos_tributaveis = provento + base_ferias - deducao
+        self.rendimentos_tributaveis = provento + base_ferias - deducao - valor_medias_ferias
 
         # Buscar por rubricas de pensão
         RUBRICAS_PENSAO = [

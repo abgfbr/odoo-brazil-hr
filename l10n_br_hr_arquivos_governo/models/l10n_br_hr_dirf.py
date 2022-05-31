@@ -514,12 +514,12 @@ class L10nBrHrDirf(models.Model):
         tx_deducao = self.env['l10n_br.hr.income.tax.deductable.amount.family']
 
         valor_por_dependente = tx_deducao.search([
-            ('year', '=', self.ano_referencia)], limit=1,
+            ('year', '=', self.ano_calendario)], limit=1,
         ).amount or 0
 
         for employee_id in self.employee_ids:
             holerites_ids = self.buscar_holerites(
-                self.ano_referencia, self.company_id, employee_id)
+                self.ano_calendario, self.company_id, employee_id)
 
             for holerite_id in holerites_ids:
                 holerite_id.atualizar_valores(valor_por_dependente)
@@ -549,6 +549,10 @@ class L10nBrHrDirf(models.Model):
         if self.ano_referencia == '2020':
             dirf.identificador_de_estrutura_do_leiaute = 'AT65HD8'
 
+        # DIRF ano referencia 2022 ano base 2021 == XJFSFHB
+        if self.ano_referencia == '2022':
+            dirf.identificador_de_estrutura_do_leiaute = 'XJFSFHB'
+
         dirf.indicador_de_retificadora = 'S' if self.retificadora else 'N'
         dirf.numero_do_recibo = self.numero_recibo
 
@@ -577,7 +581,7 @@ class L10nBrHrDirf(models.Model):
                 re.sub('[^0-9]', '', str(employee_id.cpf))
             beneficiario.nome_bpfdec = employee_id.name
             self.populate_beneficiario(
-                dirf, beneficiario, employee_id, self.ano_referencia,
+                dirf, beneficiario, employee_id, self.ano_calendario,
                 self.company_id)
 
             grupo = dirf.get_grupoFuncionarioPorCodigoReceita(
