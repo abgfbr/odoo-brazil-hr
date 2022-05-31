@@ -96,7 +96,8 @@ class ContractRessarcimento(models.Model):
 
                 else:
                     # Reverte o evento contábil gerado a partir da provisão
-                    record.account_event_provisao_id.button_reverter_lancamentos()
+                    if record.account_event_provisao_id.state != 'reversed':
+                        record.account_event_provisao_id.button_reverter_lancamentos()
 
                     account_event = {
                         'ref': NOME_LANCAMENTO.get(
