@@ -70,7 +70,7 @@ class HrPayslip(models.Model):
                 liquido = sum(holerite.line_ids.filtered(
                     lambda x: x.code == 'LIQUIDO').mapped('total'))
                 if liquido and float_compare(
-                        holerite.total_folha, liquido, precision_rounding=0.01):
+                        holerite.total_folha, liquido, precision_rounding=0.1):
                     raise exceptions.Warning(
                         _('Rúbrica LIQUIDO com valor inválido!'))
 
@@ -243,11 +243,11 @@ class HrPayslip(models.Model):
             if base_inss:
                 soma_base_inss = base_inss[0].total
 
-            base_inss_13 = \
-                holerite.line_ids.filtered(lambda x: x.code == 'BASE_INSS_13')
+            #base_inss_13 = \
+            #    holerite.line_ids.filtered(lambda x: x.code == 'BASE_INSS_13')
 
-            if base_inss_13:
-                soma_base_inss += base_inss_13.total
+            #if base_inss_13:
+            #    soma_base_inss += base_inss_13.total
 
             holerite.total_folha = total
             holerite.total_proventos = total_proventos
@@ -2361,6 +2361,8 @@ class HrPayslip(models.Model):
         # normal ao funcionario.
         DIAS_A_MAIOR = 0
 
+        existe_segunda_parcela_13_periodo = False
+
         if payslip.tipo_de_folha == 'rescisao':
 
             # verificar se ja foi gerado o holerite do mes
@@ -2372,6 +2374,17 @@ class HrPayslip(models.Model):
                 ('ano', '=', payslip.ano),
                 ('state', 'in', ['done', 'verify']),
             ])
+
+            segunda_parcela_13_periodo = self.search([
+                ('contract_id', '=', payslip.contract_id.id),
+                ('tipo_de_folha', '=', 'decimo_terceiro'),
+                ('mes_do_ano2', '=', payslip.mes_do_ano2),
+                ('ano', '=', payslip.ano),
+                ('struct_id', '=', 12)
+            ])
+
+            existe_segunda_parcela_13_periodo = True if \
+                segunda_parcela_13_periodo else False
 
             # Seta todos na mesma data para nao calcular nenhum dia de saldo de
             # salario, visto que ja foi calculado no holerite normal
@@ -2606,6 +2619,8 @@ class HrPayslip(models.Model):
         references = defaultdict(list)
 
         for rule in obj_rule.browse(sorted_rule_ids):
+            if payslip.tipo_de_folha == 'rescisao' and existe_segunda_parcela_13_periodo and rule.code in ['ADIANTADOPROP13', 'DESCONTO_ADIANTAMENTO_13', 'PROP13', 'BASE_INSS_13', 'INSS_13', 'IRPF_13', 'FGTS_F_13', 'INSS_EMPRESA_F_13']:
+                continue
             localdict['result'] = None
             localdict['result_qty'] = 1.0
             localdict['result_rate'] = 100
@@ -2661,6 +2676,9 @@ class HrPayslip(models.Model):
             else:
                 amount, qty, rate = \
                     obj_rule.compute_rule(rule.id, localdict)
+
+                if isinstance(amount, tuple):
+                    amount = amount[0]
 
                 # Pegar Referencia que irá para o holerite
                 ref = obj_rule.get_reference_rubrica(
