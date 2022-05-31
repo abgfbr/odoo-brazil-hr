@@ -72,6 +72,8 @@ def payslip_recibo_ferias(pool, cr, uid, local_context, context):
     valor_salario = valor.formata_valor(payslip_id.contract_id.wage)
     media_substituicao = payslip_id.buscar_total_rubrica_payslip(
         'MEDIA_SALARIO_FERIAS')
+    media_substituicao += payslip_id.buscar_total_rubrica_payslip(
+        'DIF_MEDIA_SALARIO_FERIAS')
     base_calculo = payslip_id.contract_id.wage
     if media_substituicao:
         base_calculo += media_substituicao
