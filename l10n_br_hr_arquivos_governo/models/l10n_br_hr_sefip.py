@@ -1266,7 +1266,9 @@ class L10nBrSefip(models.Model):
         # proventos. Ex.: casos como diferença salarial do mês anterior paga em
         # CCT, que deverão ser informadas na SEFIP
         if folha.tipo_de_folha == 'rescisao':
-            return self._valor_rubrica(folha.line_ids, 'BASE_INSS')
+            result = self._valor_rubrica(folha.line_ids, 'BASE_INSS')
+
+            return result if result > 0 else 0
 
         #
         # Para diretores buscar a base do INSS, pois a
