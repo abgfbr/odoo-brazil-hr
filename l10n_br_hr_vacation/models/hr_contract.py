@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 KMEE - Hendrix Costa <hendrix.costa@kmee.com.br>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+from datetime import datetime
 
 from openerp import api, models, fields, _
 from dateutil.relativedelta import relativedelta
@@ -211,8 +212,9 @@ class HrContract(models.Model):
 
             # Laço para percorrer todos os holerites de férias(aviso de férias)
             #
+            evento_ferias = []
             for holerite in holerites_ids:
-
+                evento_ferias.append(holerite.holidays_ferias.id)
                 # Buscar controle de férias referente ao aviso de férias que
                 # esta sendo processado
                 #
@@ -264,6 +266,62 @@ class HrContract(models.Model):
                     controle_id.hr_holiday_add_id = \
                         holerite.holidays_ferias.parent_id
 
+            anos = [datetime.now().year, datetime.now().year - 1]
+            controle_sem_holerite_ferias = self.env['hr.holidays'].search(
+                [
+                    ('id', 'not in', evento_ferias),
+                    ('contrato_id', '=', contrato.id),
+                    ('type', '=', 'remove'),
+                    ('ano', 'in', anos),
+                    ('tipo', '=', 'ferias'),
+                ]
+            )
+            if controle_sem_holerite_ferias:
+                for controle_solto in controle_sem_holerite_ferias:
+                    controle_id = controle_ferias_obj.search([
+                        ('inicio_aquisitivo', '=', controle_solto.parent_id.inicio_aquisitivo),
+                        ('fim_aquisitivo', '=', controle_solto.parent_id.fim_aquisitivo),
+                        ('inicio_gozo', '=', False),
+                        ('fim_gozo', '=', False),
+                        ('contract_id', '=', contrato.id)
+                    ])
+                    # Recuperar datas do aviso de férias para construir
+                    # controle de ferias
+                    #
+                    data_inicio = \
+                        fields.Date.from_string(controle_solto.data_inicio)
+                    data_fim = fields.Date.from_string(controle_solto.data_fim)
+                    abono_pecuniario = \
+                        controle_solto.sold_vacations_days
+                    dias_gozados = (data_fim - data_inicio).days + 1 + \
+                                   abono_pecuniario
+
+                    # se houver saldo de dias, isto é, se o funcinoario tirou
+                    # apenas uma parte das férias, duplicar controle vazio
+                    #
+                    if (controle_id.saldo - dias_gozados) > 0:
+                        novo_periodo = controle_id.copy()
+                        novo_periodo.dias_gozados_anteriormente += dias_gozados
+
+                    # Setar datas do novo controle de férias baseado no holerite
+                    # de férias (aaviso de férias)
+                    controle_id.inicio_gozo = data_inicio
+                    controle_id.fim_gozo = data_fim
+                    controle_id.data_aviso = data_inicio
+                    controle_id.dias_gozados = dias_gozados
+
+                    # Linkar Holerite com o Período Aquisitivo
+                    controle_solto.parent_id.periodo_aquisitivo = controle_id
+
+                    # Recuperar a solicitação de férias (holiday remove) holerite
+                    #
+                    controle_id.hr_holiday_remove_id = controle_solto.id
+
+                    # Recuperar a alocação de férias (holiday add) da
+                    # solicitação de férias
+                    #
+                    controle_id.hr_holiday_add_id = \
+                        controle_solto.parent_id.parent_id.id
             # Buscar os holiday do tipo ADD que perderam a relação com o
             # controle de férias
             #
