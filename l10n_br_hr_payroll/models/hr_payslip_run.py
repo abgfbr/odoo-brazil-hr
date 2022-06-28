@@ -225,14 +225,6 @@ class HrPayslipRun(models.Model):
                     ('total', '>', 0),
                 ])
 
-                # Identificado as rubricas de decimo terceiro adiantadas em
-                # férias, verificar se o valor adiantado foi exatamente
-                # metade do salario, pois há casos de alterações salariais
-                # no período.
-                rubricas_to_remove_ids = rubricas_to_remove_ids.filtered(
-                    lambda x: abs(
-                        x.total - (x.slip_id.contract_id.wage / 2)) <= 0.01)
-
                 # filtrar os contratos dessas rubricas
                 contratos_ids = rubricas_to_remove_ids.mapped('contract_id')
 
@@ -295,6 +287,9 @@ class HrPayslipRun(models.Model):
         self.verificar_holerites_gerados()
         self.busca_holerite_orfao()
 
+    def gerar_ocorrencias(self, contract_id, datetime, error):
+        pass
+
     @profile
     def _gerar_holerite(self, contrato):
         # Provisionamento de ferias
@@ -313,29 +308,41 @@ class HrPayslipRun(models.Model):
             contrato.action_button_update_controle_ferias(
                 data_referencia=data_inicio)
 
-            for periodo in contrato.vacation_control_ids:
-                periodo_aquisitivo_provisao = \
-                    str(int(periodo.saldo)) + \
-                    ' dias referente a ' + \
-                    formata_data(periodo.inicio_aquisitivo) + \
-                    ' - ' + \
-                    formata_data(periodo.fim_aquisitivo)
+            periodo_aquisitivo_ids = contrato.vacation_control_ids[:2]
 
-                payslip_with_periodo = self.env['hr.payslip'].search([
+            for periodo in periodo_aquisitivo_ids:
+                ferias_proximo_mes = self.mes_do_ano + 1 if self.mes_do_ano < 12 else 1
+                ferias_ano = self.ano if ferias_proximo_mes > self.mes_do_ano else self.ano + 1
+
+                ferias_a_tirar = self.env['hr.payslip'].search([
                     ('contract_id', '=', contrato.id),
-                    ('periodo_aquisitivo_provisao', '=', periodo_aquisitivo_provisao),
-                    ('tipo_de_folha', '=', 'provisao_ferias'),
-                    ('mes_do_ano', '=', self.mes_do_ano),
-                    ('is_simulacao', '=', False)
+                    ('tipo_de_folha', '=', 'ferias'),
+                    ('mes_do_ano', '=', ferias_proximo_mes),
+                    ('ano', '=', ferias_ano),
+                    ('is_simulacao', '=', False),
+                    ('inicio_aquisitivo', '=', periodo.inicio_aquisitivo)
                 ])
 
-                if periodo.saldo > 0 and not periodo.inicio_gozo and not \
-                        payslip_with_periodo:
+                saldo = periodo.saldo
+                saldo_manual = False
+
+                if ferias_a_tirar:
+                    saldo += ferias_a_tirar.worked_days_line_ids.filtered(lambda x: x.code == 'FERIAS').number_of_days
+                    saldo += ferias_a_tirar.worked_days_line_ids.filtered(lambda x: x.code == 'ABONO_PECUNIARIO').number_of_days
+                    saldo_manual = True
+
+                if saldo:
+                    periodo_aquisitivo_provisao = \
+                        str(int(saldo)) + \
+                        ' dias referente a ' + \
+                        formata_data(periodo.inicio_aquisitivo) + \
+                        ' - ' + \
+                        formata_data(periodo.fim_aquisitivo)
                     data_fim = fields.Date.from_string(inicio_mes) + \
                                relativedelta(days=periodo.saldo)
                     payslip_obj = self.env['hr.payslip']
 
-                    payslip = payslip_obj.create({
+                    domain = {
                         'contract_id': contrato.id,
                         'periodo_aquisitivo': periodo.id,
                         'mes_do_ano': self.mes_do_ano,
@@ -348,18 +355,29 @@ class HrPayslipRun(models.Model):
                         'payslip_run_id': self.id,
                         'periodo_aquisitivo_provisao':
                             periodo_aquisitivo_provisao,
-                        'eh_mes_comercial': self.eh_mes_comercial,
-                    })
+                        'eh_mes_comercial': self.eh_mes_comercial
+                    }
+
+                    if saldo_manual:
+                        domain['saldo_periodo_aquisitivo_manual'] = saldo
+
+                    payslip = payslip_obj.create(domain)
                     try:
                         # payslip._compute_set_dates()
                         payslip.compute_sheet()
-                        self.env.cr.commit()
+                        if len(payslip.line_resume_ids) == 0:
+                            self.gerar_ocorrencias(contrato, datetime.now(),
+                                                   "O Holerite foi gerado sem rubricas de provento e desconto!")
+                            payslip.unlink()
+                        else:
+                            self.env.cr.commit()
                         _logger.info(u"Holerite " + contrato.display_name +
                                      u" processado com sucesso!")
                     except Exception as e:
                         _logger.warning(
                             u"Holerite {} falhou durante o cálculo! Erro: {}".format(contrato.display_name, e.message)
                         )
+                        self.gerar_ocorrencias(contrato, datetime.now(), e.message)
                         payslip.unlink()
 
                     if len(payslip.line_resume_ids) == 0:
@@ -405,15 +423,18 @@ class HrPayslipRun(models.Model):
                 _logger.info(
                     u"Holerite " + contrato.display_name +
                     u" processado com sucesso!")
+                if len(payslip.line_resume_ids) == 0:
+                    payslip.unlink()
+                    self.gerar_ocorrencias(contrato, datetime.now(), "O Holerite foi gerado sem rubricas de provento e desconto!")
+                else:
+                    self.env.cr.commit()
                 self.env.cr.commit()
             except Exception as e:
                 _logger.warning(
                     u"Holerite {} falhou durante o cálculo! Erro: {}".format(
                         contrato.display_name, e.message)
                 )
-                payslip.unlink()
-
-            if len(payslip.line_resume_ids) == 0:
+                self.gerar_ocorrencias(contrato, datetime.now(), e.message)
                 payslip.unlink()
 
     @api.multi
