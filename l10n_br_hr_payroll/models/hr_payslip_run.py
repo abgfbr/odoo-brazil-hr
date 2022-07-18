@@ -142,6 +142,69 @@ class HrPayslipRun(models.Model):
         self.date_start = primeiro_dia_do_mes
         self.date_end = ultimo_dia_do_mes
 
+    @api.multi
+    def buscar_contratos_sem_provisao_ferias(self, contratos_ids):
+        contratos_sem_provisao = []
+        for contrato in contratos_ids:
+            periodos_a_gerar = 0
+
+            inicio_mes = str(self.ano).zfill(4) + '-' + \
+                         str(self.mes_do_ano).zfill(2) + '-01'
+
+            # se o contrato iniciou na metade do mes corrente
+            # ex.: provisionando mes marco e contrato iniciou 15/03
+            if contrato.date_start > inicio_mes:
+                inicio_mes = contrato.date_start
+
+            data_inicio = fields.Date.to_string(ultimo_dia_mes(inicio_mes))
+
+            contrato.action_button_update_controle_ferias(
+                data_referencia=data_inicio)
+
+            periodo_aquisitivo_ids = contrato.vacation_control_ids[:2]
+
+            for periodo in periodo_aquisitivo_ids:
+                ferias_proximo_mes = self.mes_do_ano + 1 if self.mes_do_ano < 12 else 1
+                ferias_ano = self.ano if ferias_proximo_mes > self.mes_do_ano else self.ano + 1
+
+                ferias_a_tirar = self.env['hr.payslip'].search([
+                    ('contract_id', '=', contrato.id),
+                    ('tipo_de_folha', '=', 'ferias'),
+                    ('mes_do_ano', '=', ferias_proximo_mes),
+                    ('ano', '=', ferias_ano),
+                    ('is_simulacao', '=', False),
+                    ('inicio_aquisitivo', '=', periodo.inicio_aquisitivo)
+                ])
+
+                saldo = periodo.saldo
+
+                if ferias_a_tirar:
+                    saldo += ferias_a_tirar.worked_days_line_ids.filtered(lambda x: x.code == 'FERIAS').number_of_days
+                    saldo += ferias_a_tirar.worked_days_line_ids.filtered(
+                        lambda x: x.code == 'ABONO_PECUNIARIO').number_of_days
+
+                if saldo:
+                    periodo_aquisitivo_provisao = \
+                        str(int(saldo)) + \
+                        ' dias referente a ' + \
+                        formata_data(periodo.inicio_aquisitivo) + \
+                        ' - ' + \
+                        formata_data(periodo.fim_aquisitivo)
+
+                    provisao = self.env["hr.payslip"].search([
+                        ("tipo_de_folha", "=", "provisao_ferias"),
+                        ("mes_do_ano", "=", self.mes_do_ano),
+                        ("ano", "=", self.ano),
+                        ("periodo_aquisitivo_provisao", "=", periodo_aquisitivo_provisao)
+                    ])
+
+                    if not provisao:
+                        periodos_a_gerar += 1
+
+            if periodos_a_gerar:
+                contratos_sem_provisao.append(contrato.id)
+
+        return contratos_sem_provisao
 
     @api.multi
     def verificar_holerites_gerados(self):
@@ -155,92 +218,95 @@ class HrPayslipRun(models.Model):
         # done = self.slip_ids.filtered(lambda s: s.state == 'done')
 
         for lote in self:
+            contratos_sem_holerite = []
             # pegar todos contratos da empresa que são válidos,
             contracts_id = self._buscar_contratos_validos(lote)
 
-            # Caso o tipo de lote for "Adiantamento de 13º", deverá ser trocado
-            # por "decimo_terceiro", já que os holerites são criados com esse
-            # tipo
-            if self.tipo_de_folha == 'adiantamento_13':
-                tipo_de_folha = 'decimo_terceiro'
+            if lote.tipo_de_folha == 'provisao_ferias':
+                contratos_sem_holerite = self.buscar_contratos_sem_provisao_ferias(contracts_id)
             else:
-                tipo_de_folha = self.tipo_de_folha
+                # Caso o tipo de lote for "Adiantamento de 13º", deverá ser trocado
+                # por "decimo_terceiro", já que os holerites são criados com esse
+                # tipo
+                if self.tipo_de_folha == 'adiantamento_13':
+                    tipo_de_folha = 'decimo_terceiro'
+                else:
+                    tipo_de_folha = self.tipo_de_folha
 
-            # buscar payslip ja processadas dos contratos validos
-            dominio_payslips = [
-                ('tipo_de_folha', '=', tipo_de_folha),
-                ('contract_id', 'in', contracts_id.ids)
-            ]
-
-            # se o lote for de provisao de ferias, buscar entre o periodo todo
-            if lote.tipo_de_folha != 'provisao_ferias':
-                dominio_payslips += [
-                    ('date_from', '>=', self.date_start),
-                    ('date_to', '<=', self.date_end),
+                # buscar payslip ja processadas dos contratos validos
+                dominio_payslips = [
+                    ('tipo_de_folha', '=', tipo_de_folha),
+                    ('contract_id', 'in', contracts_id.ids)
                 ]
 
-            # Se o lote for de qualquer utro tipo, buscar apenas paylisps
-            # do mes setado no lote.
-            else:
-                dominio_payslips += [
+                # se o lote for de provisao de ferias, buscar entre o periodo todo
+                if lote.tipo_de_folha != 'provisao_ferias':
+                    dominio_payslips += [
+                        ('date_from', '>=', self.date_start),
+                        ('date_to', '<=', self.date_end),
+                    ]
+
+                # Se o lote for de qualquer utro tipo, buscar apenas paylisps
+                # do mes setado no lote.
+                else:
+                    dominio_payslips += [
+                        ('mes_do_ano', '=', self.mes_do_ano),
+                        ('ano', '=', self.ano),
+                    ]
+
+                # Buscar payslips dos contratos validos que ja foram processadas
+                payslips = self.env['hr.payslip'].search(dominio_payslips)
+
+                # grupo contendo contratos que ja foram processados naquele período
+                contratos_com_holerites = []
+                for payslip in payslips:
+                    if payslip.contract_id.id not in contratos_com_holerites:
+                        contratos_com_holerites.append(payslip.contract_id.id)
+                    if not payslip.payslip_run_id:
+                        payslip.payslip_run_id = lote.id
+
+                for contrato in contracts_id:
+                     # se o contrato valido nao esta nos contratos que ja possuem
+                     # payslip naquele periodo
+                     if contrato.id not in contratos_com_holerites:
+                         # remover contratos finalizados
+                         if not contrato.date_end:
+                             contratos_sem_holerite.append(contrato.id)
+                         else:
+                             if contrato.date_end > lote.date_end:
+                                 contratos_sem_holerite.append(contrato.id)
+
+                # Adiantamento eh uma rubrica
+                # no processamento do lote de adiantamento de 13,
+                # filtrar os contratos que ja foram processados naquele intervalo
+                # com aquela rubrica
+                if lote.tipo_de_folha == 'adiantamento_13':
+                    # buscar as rubricas que foram processadas de adiantamento 13
+                    rubricas_to_remove_ids = self.env['hr.payslip.line'].search([
+                        ('contract_id', 'in', contratos_sem_holerite),
+                        ('code', '=', 'ADIANTAMENTO_13'),
+                        ('slip_id.ano', '=', self.ano),
+                        ('slip_id.mes_do_ano', '<=', self.mes_do_ano),
+                        ('slip_id.state', '=', 'done'),
+                        ('total', '>', 0),
+                    ])
+
+                    # filtrar os contratos dessas rubricas
+                    contratos_ids = rubricas_to_remove_ids.mapped('contract_id')
+
+                    # remover esses contratos dos contratos validos
+                    contratos_sem_holerite = \
+                        list(set(contratos_sem_holerite) - set(contratos_ids.ids))
+
+                # Buscar rescisoes da competencia
+                domain = [
+                    ('tipo_de_folha', 'in', ['rescisao', 'rescisao_complementar']),
+                    ('is_simulacao', '!=', True),
                     ('mes_do_ano', '=', self.mes_do_ano),
                     ('ano', '=', self.ano),
+                    ('company_id', '=', lote.company_id.id),
                 ]
-
-            # Buscar payslips dos contratos validos que ja foram processadas
-            payslips = self.env['hr.payslip'].search(dominio_payslips)
-
-            # grupo contendo contratos que ja foram processados naquele período
-            contratos_com_holerites = []
-            for payslip in payslips:
-                if payslip.contract_id.id not in contratos_com_holerites:
-                    contratos_com_holerites.append(payslip.contract_id.id)
-                if not payslip.payslip_run_id:
-                    payslip.payslip_run_id = lote.id
-
-            contratos_sem_holerite = []
-            for contrato in contracts_id:
-                 # se o contrato valido nao esta nos contratos que ja possuem
-                 # payslip naquele periodo
-                 if contrato.id not in contratos_com_holerites:
-                     # remover contratos finalizados
-                     if not contrato.date_end:
-                         contratos_sem_holerite.append(contrato.id)
-                     else:
-                         if contrato.date_end > lote.date_end:
-                             contratos_sem_holerite.append(contrato.id)
-
-            # Adiantamento eh uma rubrica
-            # no processamento do lote de adiantamento de 13,
-            # filtrar os contratos que ja foram processados naquele intervalo
-            # com aquela rubrica
-            if lote.tipo_de_folha == 'adiantamento_13':
-                # buscar as rubricas que foram processadas de adiantamento 13
-                rubricas_to_remove_ids = self.env['hr.payslip.line'].search([
-                    ('contract_id', 'in', contratos_sem_holerite),
-                    ('code', '=', 'ADIANTAMENTO_13'),
-                    ('slip_id.ano', '=', self.ano),
-                    ('slip_id.mes_do_ano', '<=', self.mes_do_ano),
-                    ('slip_id.state', '=', 'done'),
-                    ('total', '>', 0),
-                ])
-
-                # filtrar os contratos dessas rubricas
-                contratos_ids = rubricas_to_remove_ids.mapped('contract_id')
-
-                # remover esses contratos dos contratos validos
-                contratos_sem_holerite = \
-                    list(set(contratos_sem_holerite) - set(contratos_ids.ids))
-
-            # Buscar rescisoes da competencia
-            domain = [
-                ('tipo_de_folha', 'in', ['rescisao', 'rescisao_complementar']),
-                ('is_simulacao', '!=', True),
-                ('mes_do_ano', '=', self.mes_do_ano),
-                ('ano', '=', self.ano),
-                ('company_id', '=', lote.company_id.id),
-            ]
-            self.payslip_rescisao_ids = self.env['hr.payslip'].search(domain)
+                self.payslip_rescisao_ids = self.env['hr.payslip'].search(domain)
 
             lote.write({
                 'contract_id': [(6, 0, contratos_sem_holerite)],
@@ -275,14 +341,7 @@ class HrPayslipRun(models.Model):
 
     @api.multi
     def gerar_holerites(self):
-        contract_id = None
-
-        if self.tipo_de_folha == "provisao_ferias":
-            contract_id = self._buscar_contratos_validos(self)
-        else:
-            contract_id = self.contract_id
-
-        for contrato in contract_id:
+        for contrato in self.contract_id:
             self._gerar_holerite(contrato)
         self.verificar_holerites_gerados()
         self.busca_holerite_orfao()
@@ -302,11 +361,6 @@ class HrPayslipRun(models.Model):
             # ex.: provisionando mes marco e contrato iniciou 15/03
             if contrato.date_start > inicio_mes:
                 inicio_mes = contrato.date_start
-
-            data_inicio = fields.Date.to_string(ultimo_dia_mes(inicio_mes))
-
-            contrato.action_button_update_controle_ferias(
-                data_referencia=data_inicio)
 
             periodo_aquisitivo_ids = contrato.vacation_control_ids[:2]
 
@@ -340,48 +394,55 @@ class HrPayslipRun(models.Model):
                         formata_data(periodo.fim_aquisitivo)
                     data_fim = fields.Date.from_string(inicio_mes) + \
                                relativedelta(days=periodo.saldo)
-                    payslip_obj = self.env['hr.payslip']
 
-                    domain = {
-                        'contract_id': contrato.id,
-                        'periodo_aquisitivo': periodo.id,
-                        'mes_do_ano': self.mes_do_ano,
-                        'mes_do_ano2': self.mes_do_ano,
-                        'date_from': inicio_mes,
-                        'date_to': data_fim,
-                        'ano': self.ano,
-                        'employee_id': contrato.employee_id.id,
-                        'tipo_de_folha': self.tipo_de_folha,
-                        'payslip_run_id': self.id,
-                        'periodo_aquisitivo_provisao':
-                            periodo_aquisitivo_provisao,
-                        'eh_mes_comercial': self.eh_mes_comercial
-                    }
+                    provisao = self.env["hr.payslip"].search([
+                        ("tipo_de_folha", "=", "provisao_ferias"),
+                        ("mes_do_ano", "=", self.mes_do_ano),
+                        ("ano", "=", self.ano),
+                        ("periodo_aquisitivo_provisao", "=",
+                         periodo_aquisitivo_provisao)
+                    ])
 
-                    if saldo_manual:
-                        domain['saldo_periodo_aquisitivo_manual'] = saldo
+                    if not provisao:
+                        payslip_obj = self.env['hr.payslip']
 
-                    payslip = payslip_obj.create(domain)
-                    try:
-                        # payslip._compute_set_dates()
-                        payslip.compute_sheet()
-                        if len(payslip.line_resume_ids) == 0:
-                            self.gerar_ocorrencias(contrato, datetime.now(),
-                                                   "O Holerite foi gerado sem rubricas de provento e desconto!")
+                        domain = {
+                            'contract_id': contrato.id,
+                            'periodo_aquisitivo': periodo.id,
+                            'mes_do_ano': self.mes_do_ano,
+                            'mes_do_ano2': self.mes_do_ano,
+                            'date_from': inicio_mes,
+                            'date_to': data_fim,
+                            'ano': self.ano,
+                            'employee_id': contrato.employee_id.id,
+                            'tipo_de_folha': self.tipo_de_folha,
+                            'payslip_run_id': self.id,
+                            'periodo_aquisitivo_provisao':
+                                periodo_aquisitivo_provisao,
+                            'eh_mes_comercial': self.eh_mes_comercial
+                        }
+
+                        if saldo_manual:
+                            domain['saldo_periodo_aquisitivo_manual'] = saldo
+
+                        payslip = payslip_obj.create(domain)
+                        try:
+                            # payslip._compute_set_dates()
+                            payslip.compute_sheet()
+                            if len(payslip.line_resume_ids) == 0:
+                                self.gerar_ocorrencias(contrato, datetime.now(),
+                                                       "O Holerite foi gerado sem rubricas de provento e desconto!")
+                                payslip.unlink()
+                            else:
+                                self.env.cr.commit()
+                            _logger.info(u"Holerite " + contrato.display_name +
+                                         u" processado com sucesso!")
+                        except Exception as e:
+                            _logger.warning(
+                                u"Holerite {} falhou durante o cálculo! Erro: {}".format(contrato.display_name, e.message)
+                            )
+                            self.gerar_ocorrencias(contrato, datetime.now(), e.message)
                             payslip.unlink()
-                        else:
-                            self.env.cr.commit()
-                        _logger.info(u"Holerite " + contrato.display_name +
-                                     u" processado com sucesso!")
-                    except Exception as e:
-                        _logger.warning(
-                            u"Holerite {} falhou durante o cálculo! Erro: {}".format(contrato.display_name, e.message)
-                        )
-                        self.gerar_ocorrencias(contrato, datetime.now(), e.message)
-                        payslip.unlink()
-
-                    if len(payslip.line_resume_ids) == 0:
-                        payslip.unlink()
 
             contrato.action_button_update_controle_ferias()
             self.env.cr.commit()
