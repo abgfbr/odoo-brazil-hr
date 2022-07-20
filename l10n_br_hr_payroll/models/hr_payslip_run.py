@@ -145,64 +145,75 @@ class HrPayslipRun(models.Model):
     @api.multi
     def buscar_contratos_sem_provisao_ferias(self, contratos_ids):
         contratos_sem_provisao = []
-        for contrato in contratos_ids:
-            periodos_a_gerar = 0
 
-            inicio_mes = str(self.ano).zfill(4) + '-' + \
-                         str(self.mes_do_ano).zfill(2) + '-01'
+        provisoes_do_mes =  self.env["hr.payslip"].search([
+            ("tipo_de_folha", "=", "provisao_ferias"),
+            ("mes_do_ano", "=", self.mes_do_ano),
+            ("ano", "=", self.ano),
+        ])
 
-            # se o contrato iniciou na metade do mes corrente
-            # ex.: provisionando mes marco e contrato iniciou 15/03
-            if contrato.date_start > inicio_mes:
-                inicio_mes = contrato.date_start
+        if not provisoes_do_mes:
+            contratos_sem_provisao = contratos_ids.ids
+        else:
+            for contrato in contratos_ids:
+                periodos_a_gerar = 0
 
-            data_inicio = fields.Date.to_string(ultimo_dia_mes(inicio_mes))
+                inicio_mes = str(self.ano).zfill(4) + '-' + \
+                             str(self.mes_do_ano).zfill(2) + '-01'
 
-            contrato.action_button_update_controle_ferias(
-                data_referencia=data_inicio)
+                # se o contrato iniciou na metade do mes corrente
+                # ex.: provisionando mes marco e contrato iniciou 15/03
+                if contrato.date_start > inicio_mes:
+                    inicio_mes = contrato.date_start
 
-            periodo_aquisitivo_ids = contrato.vacation_control_ids[:2]
+                data_inicio = fields.Date.to_string(ultimo_dia_mes(inicio_mes))
 
-            for periodo in periodo_aquisitivo_ids:
-                ferias_proximo_mes = self.mes_do_ano + 1 if self.mes_do_ano < 12 else 1
-                ferias_ano = self.ano if ferias_proximo_mes > self.mes_do_ano else self.ano + 1
+                contrato.action_button_update_controle_ferias(
+                    data_referencia=data_inicio)
 
-                ferias_a_tirar = self.env['hr.payslip'].search([
-                    ('contract_id', '=', contrato.id),
-                    ('tipo_de_folha', '=', 'ferias'),
-                    ('mes_do_ano', '=', ferias_proximo_mes),
-                    ('ano', '=', ferias_ano),
-                    ('is_simulacao', '=', False),
-                    ('inicio_aquisitivo', '=', periodo.inicio_aquisitivo)
-                ])
+                periodo_aquisitivo_ids = contrato.vacation_control_ids[:2]
 
-                saldo = periodo.saldo
+                for periodo in periodo_aquisitivo_ids:
+                    ferias_proximo_mes = self.mes_do_ano + 1 if self.mes_do_ano < 12 else 1
+                    ferias_ano = self.ano if ferias_proximo_mes > self.mes_do_ano else self.ano + 1
 
-                if ferias_a_tirar:
-                    saldo += ferias_a_tirar.worked_days_line_ids.filtered(lambda x: x.code == 'FERIAS').number_of_days
-                    saldo += ferias_a_tirar.worked_days_line_ids.filtered(
-                        lambda x: x.code == 'ABONO_PECUNIARIO').number_of_days
-
-                if saldo:
-                    periodo_aquisitivo_provisao = \
-                        str(int(saldo)) + \
-                        ' dias referente a ' + \
-                        formata_data(periodo.inicio_aquisitivo) + \
-                        ' - ' + \
-                        formata_data(periodo.fim_aquisitivo)
-
-                    provisao = self.env["hr.payslip"].search([
-                        ("tipo_de_folha", "=", "provisao_ferias"),
-                        ("mes_do_ano", "=", self.mes_do_ano),
-                        ("ano", "=", self.ano),
-                        ("periodo_aquisitivo_provisao", "=", periodo_aquisitivo_provisao)
+                    ferias_a_tirar = self.env['hr.payslip'].search([
+                        ('contract_id', '=', contrato.id),
+                        ('tipo_de_folha', '=', 'ferias'),
+                        ('mes_do_ano', '=', ferias_proximo_mes),
+                        ('ano', '=', ferias_ano),
+                        ('is_simulacao', '=', False),
+                        ('inicio_aquisitivo', '=', periodo.inicio_aquisitivo)
                     ])
 
-                    if not provisao:
-                        periodos_a_gerar += 1
+                    saldo = periodo.saldo
 
-            if periodos_a_gerar:
-                contratos_sem_provisao.append(contrato.id)
+                    if ferias_a_tirar:
+                        saldo += ferias_a_tirar.worked_days_line_ids.filtered(lambda x: x.code == 'FERIAS').number_of_days
+                        saldo += ferias_a_tirar.worked_days_line_ids.filtered(
+                            lambda x: x.code == 'ABONO_PECUNIARIO').number_of_days
+
+                    if saldo:
+                        periodo_aquisitivo_provisao = \
+                            str(int(saldo)) + \
+                            ' dias referente a ' + \
+                            formata_data(periodo.inicio_aquisitivo) + \
+                            ' - ' + \
+                            formata_data(periodo.fim_aquisitivo)
+
+                        provisao = self.env["hr.payslip"].search([
+                            ("tipo_de_folha", "=", "provisao_ferias"),
+                            ("contract_id", "=", contrato.id),
+                            ("mes_do_ano", "=", self.mes_do_ano),
+                            ("ano", "=", self.ano),
+                            ("periodo_aquisitivo_provisao", "=", periodo_aquisitivo_provisao)
+                        ])
+
+                        if not provisao:
+                            periodos_a_gerar += 1
+
+                if periodos_a_gerar:
+                    contratos_sem_provisao.append(contrato.id)
 
         return contratos_sem_provisao
 
