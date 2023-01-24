@@ -216,8 +216,8 @@ def totalizadores_linhas_holerites(payslip_lines, payslip_autonomo_ids=[]):
                 # Calcular manualmente o INSS para exibicao do analitico.
                 # PS Futuramente implementaremos o cálculo automatico do
                 # INSS / INSS_PATRONAL para os autonomos
-                inss_empresa_autonomo.inss_empresa += line_id.total * 0.225
-                inss_empresa_autonomo.total += line_id.total * 0.225
+                inss_empresa_autonomo.inss_empresa += line_id.total * 0.2
+                inss_empresa_autonomo.total += line_id.total * 0.2
 
     total_bruto_inss_base = \
         inss_empresa_funcionario.base + inss_empresa_pro_labore.base + \
