@@ -431,6 +431,7 @@ def analytic_report(pool, cr, uid, local_context, context):
     """
     data = {}
     payslips_rescisoes = []
+    payslips_rpa = []
 
     proxy = pool['wizard.l10n_br_hr_payroll.analytic_report']
     wizard = proxy.browse(cr, uid, context['active_id'])
@@ -500,7 +501,13 @@ def analytic_report(pool, cr, uid, local_context, context):
         cr, uid, busca)
     payslip_autonomo_ids = pool['hr.payslip.autonomo'].browse(
         cr, uid, payslip_line_autonomos_ids)
-    
+    payslips_rpa = payslip_autonomo_ids
+    if payslips_rpa:
+        data.update({'payslips_rpa': payslips_rpa,
+                     'exibir_rpa': True})
+    else:
+        data.update({'payslips_rpa': [],
+                     'exibir_rpa': False})
     # 
     # Totalizadores
     #
