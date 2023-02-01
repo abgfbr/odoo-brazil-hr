@@ -66,6 +66,28 @@ class L10nBrHrPayslip(models.Model):
                 else:
                     all_rubricas[code] = rubrica_holerite
 
+        for payslip in self.payslip_rpa_ids:
+            payslip.gerar_codigo_contabilizacao()
+            # Rubricas do holerite para contabilizar
+            rubricas_holerite = payslip.gerar_contabilizacao_rubricas()
+
+            for rubrica_holerite in rubricas_holerite:
+                # EX.: rubrica_holerite = {'code': 'INSS', 'valor': 621.03}
+                code = rubrica_holerite[2].get('code')
+                valor = rubrica_holerite[2].get('valor')
+
+                if code in all_rubricas:
+                    # Somar rubrica do holerite ao dict totalizador
+                    valor_total = \
+                        all_rubricas.get(code)[2].get('valor') + valor
+                    all_rubricas.get(code)[2].update(valor=valor_total)
+                    line_id = \
+                        rubrica_holerite[2].get('hr_payslip_line_id')[0][1]
+                    all_rubricas.get(code)[2].get(
+                        'hr_payslip_line_id').append((4, line_id))
+                else:
+                    all_rubricas[code] = rubrica_holerite
+
         return all_rubricas.values()
 
     @api.multi
