@@ -25,22 +25,22 @@ NOME_LANCAMENTO = {
 class L10nBrHrPayslipAutonomo(models.Model):
     _inherit = b'hr.payslip.autonomo'
 
-    move_id = fields.One2many(
-        string='Accounting Entry',
-        comodel_name='account.move',
-        inverse_name='payslip_autonomo_id',
-    )
-
-    move_lines_id = fields.One2many(
-        string=u'Lançamentos',
-        comodel_name='account.move.line',
-        inverse_name='payslip_autonomo_id',
-    )
-
-    journal_id = fields.Many2one(
-        comodel_name='account.journal',
-        string=u"Diário",
-    )
+    # move_id = fields.One2many(
+    #     string='Accounting Entry',
+    #     comodel_name='account.move',
+    #     inverse_name='payslip_autonomo_id',
+    # )
+    #
+    # move_lines_id = fields.One2many(
+    #     string=u'Lançamentos',
+    #     comodel_name='account.move.line',
+    #     inverse_name='payslip_autonomo_id',
+    # )
+    #
+    # journal_id = fields.Many2one(
+    #     comodel_name='account.journal',
+    #     string=u"Diário",
+    # )
 
     @api.multi
     def _buscar_contas(self, salary_rule):
@@ -158,3 +158,61 @@ class L10nBrHrPayslipAutonomo(models.Model):
             'payslip_autonomo_id': slip.id,
         }
         return move
+
+    def gerar_contabilizacao_rubricas(self):
+        """
+        Gerar um dict contendo a contabilização de cada rubrica
+        return { string 'CODE' : float valor}
+        {
+            'data':         '2019-01-01',
+            'lines':        [{'code': 'LIQUIDO', 'valor': 123,
+                                'historico_padrao': {'mes': '01'}},
+                             {'code': 'INSS', 'valor': 621.03}
+                                'historico_padrao': {'nome': 'Nome do lança'}},
+                            ],
+            'ref':          identificação do módulo de origem
+            'model':        (opcional) model de origem
+            'res_id':       (opcional) id do registro de origem
+            'period_id'     (opcional) account.period
+            'company_id':   (opcional) res.company
+        }
+        """
+        contabilizacao_rubricas = []
+
+        # Roda as Rubricas e Cria os lançamentos contábeis
+        for line in self.line_ids:
+            if line.total and line.salary_rule_id.gerar_contabilizacao:
+                contabilizacao_rubricas.append((0, 0, {
+                    'code': line.codigo_contabil,
+                    'valor': line.total,
+                    # opcional para historico padrao
+                    'name': line.salary_rule_id.name,
+                    'hr_payslip_line_id': [(4, line.id)],
+                }))
+        return contabilizacao_rubricas
+
+    @api.multi
+    def gerar_codigo_contabilizacao(self):
+        """
+        Se o lote ja tiver sido processado, os códigos contabeis das rubricas
+        nao foram processados. Essa função atualiza a linha do holerite do
+        com o código contabil de cada rubrica
+        """
+        for holerite_id in self:
+            for line_id in holerite_id.line_ids:
+
+                # Se nao gerar contabilizacao pula a rubrica
+                if not line_id.salary_rule_id.gerar_contabilizacao:
+                    continue
+
+                line_id.codigo_contabil = \
+                    line_id.salary_rule_id.codigo_contabil
+
+                if not line_id.codigo_contabil:
+                    line_id.codigo_contabil = \
+                        line_id.salary_rule_id.code
+
+                # Adicionar o sufixo para contabilização no contrato
+                if line_id.slip_id.contract_id.sufixo_code_account:
+                    line_id.codigo_contabil += \
+                        line_id.slip_id.contract_id.sufixo_code_account
