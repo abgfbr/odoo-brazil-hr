@@ -4,6 +4,7 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 from datetime import datetime, timedelta
+import calendar
 
 from openerp import api, fields, models
 from openerp import exceptions
@@ -211,7 +212,7 @@ class HrContract(models.Model):
                     datetime.strptime(change[i].change_date_reference, "%Y-%m-%d")
                 d_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
                 d_fim = datetime.strptime(data_fim, "%Y-%m-%d")
-                d_fim = d_fim.replace(day=31)
+                d_fim = d_fim.replace(day=calendar.monthrange(fields.Datetime.from_string(fields.Datetime.now()).year, fields.Datetime.from_string(fields.Datetime.now()).month)[1])
 
                 dias = (d_fim - d_inicio) + timedelta(days=1)
 
