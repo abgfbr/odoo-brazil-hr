@@ -303,6 +303,8 @@ class HrContract(models.Model):
                         novo_periodo = controle_id.copy()
                         novo_periodo.dias_gozados_anteriormente += dias_gozados
 
+                    if not controle_id:
+                        continue
                     # Setar datas do novo controle de férias baseado no holerite
                     # de férias (aaviso de férias)
                     controle_id.inicio_gozo = data_inicio

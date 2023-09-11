@@ -66,3 +66,5 @@ def payslip_autonomo_report(pool, cr, uid, local_context, context):
     if len(payslip_id.line_resume_ids) > max_linhas:
         local_context['grupo_rubricas_2'] = \
             payslip_id.line_resume_ids[max_linhas:]
+
+    print(local_context)
