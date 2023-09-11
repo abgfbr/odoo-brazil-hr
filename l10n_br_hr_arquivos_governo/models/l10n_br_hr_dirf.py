@@ -183,7 +183,7 @@ class L10nBrHrDirf(models.Model):
 
                 #  Buscar todos holerites do ano
                 holerites_no_ano = self.buscar_holerites(
-                    record.ano_referencia, record.company_id,
+                    record.ano_calendario, record.company_id,
                     tipo_folha=tipoFolha)
 
                 # DIRF para todos funcionarios que tiveram rendimentos

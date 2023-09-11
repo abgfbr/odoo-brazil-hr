@@ -493,7 +493,7 @@ class HrPayslipAutonomo(models.Model):
             # Caso nao esteja computando holerite de provisão de ferias ou
             # de decimo terceiro recuperar as regras especificas do contrato
             applied_specific_rule = \
-                self.get_contract_specific_rubrics(contract_id, rule_ids)
+                self.get_contract_specific_rubrics(rule_ids)
 
             # organizando as regras pela sequencia de execução definida
             sorted_rule_ids = \

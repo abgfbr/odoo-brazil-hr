@@ -70,7 +70,7 @@ class HrPayslip(models.Model):
                 liquido = sum(holerite.line_ids.filtered(
                     lambda x: x.code == 'LIQUIDO').mapped('total'))
                 if liquido and float_compare(
-                        holerite.total_folha, liquido, precision_rounding=0.1):
+                        holerite.total_folha, liquido, precision_rounding=0.01):
                     raise exceptions.Warning(
                         _('Rúbrica LIQUIDO com valor inválido!'))
 
@@ -1193,6 +1193,21 @@ class HrPayslip(models.Model):
             return 0, ' '
 
     @profile
+    def diferenca_irpf_ferias(self):
+        result = 0
+
+        if self.holidays_ferias:
+            base_ir_ferias = self.holidays_ferias.slip_ids[0].base_irpf
+            ir_ferias = self.holidays_ferias.slip_ids[0].line_resume_ids.filtered(
+                    lambda x: x.code == 'IRPF_FERIAS').total
+            inss_ferias = self.holidays_ferias.slip_ids[0].inss or 0
+            ir_corrigido_ferias = self.IRRF(base_ir_ferias, inss_ferias)[0]
+
+            result = ir_ferias - ir_corrigido_ferias
+
+        return result
+
+    @profile
     def INSS_vinculo_cedente(self):
         """
         Verificar se no vínculo anterior já houve alguma contribuição com a
@@ -1589,6 +1604,7 @@ class HrPayslip(models.Model):
         categoria_bruto = self.env.ref(
             'hr_payroll.BRUTO'
         )
+        
         for line in payslip_simulacao.line_ids:
             if payslip_simulacao.tipo_de_folha == "ferias":
                 if line.salary_rule_id.code == "FERIAS" and \
@@ -1598,7 +1614,9 @@ class HrPayslip(models.Model):
                         ['1/3_FERIAS', '1/3_FERIAS_S_ONUS'] and um_terco_ferias:
                     return line.total
             else:
+                _logger.info("decimo_terceiro")
                 if line.salary_rule_id.category_id.id == categoria_bruto.id:
+                    _logger.info("Bruto!!!!")
                     return line.total
 
     @profile
@@ -1662,7 +1680,7 @@ class HrPayslip(models.Model):
 
     @profile
     def _simulacao_decimo_terceiro(self):
-
+        
         data_inicio = self.data_afastamento
         data_fim = self.data_afastamento
 
@@ -1674,6 +1692,7 @@ class HrPayslip(models.Model):
             ('contract_id', '=', self.contract_id.id),
         ]
         payslip_simulacao = self.env['hr.payslip'].search(domain)
+        
         if payslip_simulacao:
             payslip_simulacao.state = 'draft'
             payslip_simulacao.unlink()
@@ -1688,13 +1707,15 @@ class HrPayslip(models.Model):
     @api.multi
     def BUSCAR_VALOR_PROPORCIONAL(
             self, tipo_simulacao, um_terco_ferias=None, ferias_vencida=None):
-
+        _logger.info(tipo_simulacao)
+        print(tipo_simulacao)
         # Se simulação férias, faça e saia
         # (ignorando o resto do método, precisa refatorar) (TODO)
         if tipo_simulacao == 'ferias':
             return self._simulacao_ferias(ferias_vencida, um_terco_ferias)
 
         if tipo_simulacao == 'decimo_terceiro':
+            _logger.info("Pedido de simulacao 13!")
             return self._simulacao_decimo_terceiro()
 
         mes_verificacao, ano_verificacao, data_inicio, data_fim = \
@@ -1992,7 +2013,7 @@ class HrPayslip(models.Model):
         :return:     float - Valor pago neste ano
         '''
         domain = [
-            ('tipo_de_folha', 'in', ['decimo_terceiro', 'ferias']),
+            ('tipo_de_folha', 'in', ['decimo_terceiro', 'ferias', 'normal']),
             ('contract_id', '=', self.contract_id.id),
             ('state', 'in', ['done', 'verify']),
             ('ano', '=', self.ano),
@@ -2010,10 +2031,12 @@ class HrPayslip(models.Model):
                         'SALARIO_13',
                         'ADIANTAMENTO_13_FERIAS',
                         'PRIMEIRA_PARCELA_13',
+                        'DIFERENCA_13_SALARIO_ESPECIFICA',
                     ]:
                         if not (self.tipo_de_folha == 'ferias'
                                 and holerite.mes_do_ano == self.mes_do_ano):
-                            valor += line.total
+                            if not (holerite.tipo_de_folha == 'normal' and line.code == 'ADIANTAMENTO_13_FERIAS'):
+                                valor += line.total
 
             # PAra contratos de PSS temos a rubrica de desconto de adiantamento do cedido
             # como é uma rubrica de deducao, diminuir o valor caso a encontre
@@ -2322,7 +2345,9 @@ class HrPayslip(models.Model):
                 adiantamento_avos_13 -= 1
         else:
             avos_13 = mes_do_ano
-
+            #dia_saida = fields.Date.from_string(payslip.date_to).day
+            #if not dia_saida + 1 >= 15:
+            #    avos_13 -= 1
         # No contrato do PSS, o calculo do 13 Salario é diferente.
         # mesmo que a data de contratação for no ano corrente,
         # contabilizar todos os meses do ano.
@@ -2354,6 +2379,7 @@ class HrPayslip(models.Model):
                 if dia_fim_contrato < 15:
 
                     avos_13 -= 1
+        
         #
         # Quando for rescisao, verificar se ja foi calculado o holerite do mes.
         # Por exemplo, a folha eh processado em 17/05 e no dia 30/05 acontece
