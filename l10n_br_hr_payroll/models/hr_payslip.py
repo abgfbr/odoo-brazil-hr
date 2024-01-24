@@ -2001,7 +2001,7 @@ class HrPayslip(models.Model):
             return holerite_ferias_id[0].line_ids.filtered(
                 lambda x: x.code == 'INSS_COMPETENCIA_ATUAL').total or 0.0
 
-        if holerite_ferias_id.mes_do_ano == (reference_mes - 1):
+        if holerite_ferias_id.mes_do_ano == (reference_mes - 1 if reference_mes > 1 else 12):
             return holerite_ferias_id[0].line_ids.filtered(
                 lambda x: x.code == 'INSS_COMPETENCIA_SEGUINTE').total or 0.0
 
