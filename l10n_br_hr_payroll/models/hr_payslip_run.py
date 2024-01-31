@@ -168,7 +168,7 @@ class HrPayslipRun(models.Model):
 
                 contador_periodos += 1
 
-            if len(periodos_aquisitivos.keys()) != len(provisoes_contratos[contrato.id]):
+            if len(periodos_aquisitivos.keys()) != len(provisoes_contratos.get(contrato.id, [])):
                 contratos_faltando_provisao.append(contrato.id)
 
         return contratos_faltando_provisao
