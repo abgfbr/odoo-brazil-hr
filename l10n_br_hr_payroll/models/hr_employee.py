@@ -49,3 +49,10 @@ class HrEmployee(models.Model):
                             u'realizada através do menu '
                             u'Alterações Contratuais' % dict_key)
         return super(HrEmployee, self).write(vals)
+
+    @api.model
+    def create(self, vals):
+        res = super(HrEmployee, self).create(vals)
+        if vals['cpf'] and vals['address_home_id']:
+            res.address_home_id.cnpj_cpf = vals['cpf']
+        return res
