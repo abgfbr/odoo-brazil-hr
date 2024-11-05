@@ -45,9 +45,52 @@ class L10nBrHrPayslip(models.Model):
         # Dict para totalizar todas rubricas de todos holerites
         all_rubricas = {}
 
+        periodo_id = self.env['account.period'].find(self.data_de_pagamento)
+        payslip_ferias = self.env['hr.payslip'].search([
+            ('data_pagamento_competencia', '>=', periodo_id.date_start),
+            ('data_pagamento_competencia', '<=', periodo_id.date_stop),
+            ('date_from', '>', periodo_id.date_stop),
+            ('tipo_de_folha', '=', 'ferias')
+        ])
+
+        for payslip in payslip_ferias:
+            rubricas_holerite = payslip.gerar_contabilizacao_rubricas(somente_ir=True)
+
+            for rubrica_holerite in rubricas_holerite:
+                # EX.: rubrica_holerite = {'code': 'INSS', 'valor': 621.03}
+                code = rubrica_holerite[2].get('code')
+                valor = rubrica_holerite[2].get('valor')
+
+                if code in all_rubricas:
+                    # Somar rubrica do holerite ao dict totalizador
+                    valor_total = \
+                        all_rubricas.get(code)[2].get('valor') + valor
+                    all_rubricas.get(code)[2].update(valor=valor_total)
+                    line_id = \
+                        rubrica_holerite[2].get('hr_payslip_line_id')[0][1]
+                    all_rubricas.get(code)[2].get(
+                        'hr_payslip_line_id').append((4, line_id))
+                else:
+                    all_rubricas[code] = rubrica_holerite
+
+        periodo_anterior_id = self.env['account.period'].search(
+                                [('date_stop', '<', periodo_id.date_start)],
+                                order="date_start DESC",
+                                limit=1)
+        payslip_ferias_mes_anterior = self.env['hr.payslip'].search([
+            ('data_pagamento_competencia', '>=', periodo_anterior_id.date_start),
+            ('data_pagamento_competencia', '<=', periodo_anterior_id.date_stop),
+            ('date_from', '>', periodo_anterior_id.date_stop),
+            ('tipo_de_folha', '=', 'ferias')
+        ])
         for payslip in self.slip_ids:
             # Rubricas do holerite para contabilizar
-            rubricas_holerite = payslip.gerar_contabilizacao_rubricas()
+            possui_ferias = payslip_ferias_mes_anterior.filtered(lambda x: x.contract_id.id == payslip.contract_id.id)
+
+            if not possui_ferias:
+                rubricas_holerite = payslip.gerar_contabilizacao_rubricas()
+            else:
+                rubricas_holerite = payslip.gerar_contabilizacao_rubricas(somente_inss=True)
 
             for rubrica_holerite in rubricas_holerite:
                 # EX.: rubrica_holerite = {'code': 'INSS', 'valor': 621.03}

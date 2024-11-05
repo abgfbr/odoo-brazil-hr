@@ -65,7 +65,30 @@ class L10nBrHrPayslip(models.Model):
 
         return result
 
-    def gerar_contabilizacao_rubricas(self):
+    def check_ferias_ir_rubrica_code(self):
+        return {
+            'FERIAS',
+            '1/3_FERIAS',
+            'ABONO_PECUNIARIO',
+            '1/3_ABONO_PECUNIARIO',
+            'BASE_IRPF',
+            'IRPF_FERIAS',
+            'BASE_IRPF_PROPORCIONAL_FERIAS'
+        }
+
+    def invert_rubrica_ferias_code_para_holerite(self, code):
+        inversoes = {
+            'FERIAS': 'FERIAS_FERIAS',
+            '1/3_FERIAS': '1/3_FERIAS_FERIAS',
+            'ABONO_PECUNIARIO': 'ABONO_PECUNIARIO_FERIAS',
+            '1/3_ABONO_PECUNIARIO': '1/3_ABONO_PECUNIARIO_FERIAS	',
+            'BASE_IRPF': 'BASE_IRPF_PROPORCIONAL_FERIAS',
+            'IRPF_FERIAS': 'IRPF_FERIAS_FERIAS',
+        }
+
+        return inversoes.get(code, code)
+
+    def gerar_contabilizacao_rubricas(self, somente_ir=False, somente_inss=False):
         """
         Gerar um dict contendo a contabilização de cada rubrica
         return { string 'CODE' : float valor}
@@ -84,17 +107,35 @@ class L10nBrHrPayslip(models.Model):
         }
         """
         contabilizacao_rubricas = []
+        rubrica_categoria_ir = self.env.ref('hr_payroll.IRPF')
 
         # Roda as Rubricas e Cria os lançamentos contábeis
         for line in self.line_ids:
             if line.total and line.salary_rule_id.gerar_contabilizacao:
-                contabilizacao_rubricas.append((0, 0, {
-                    'code': line.codigo_contabil,
-                    'valor': line.total,
-                    # opcional para historico padrao
-                    'name': line.salary_rule_id.name,
-                    'hr_payslip_line_id': [(4, line.id)],
-                }))
+                if somente_ir and  line.salary_rule_id.code in self.check_ferias_ir_rubrica_code():
+                    contabilizacao_rubricas.append((0, 0, {
+                        'code': self.invert_rubrica_ferias_code_para_holerite(line.code),
+                        'valor': line.total,
+                        # opcional para historico padrao
+                        'name': line.salary_rule_id.name,
+                        'hr_payslip_line_id': [(4, line.id)],
+                    }))
+                if somente_inss and line.salary_rule_id.code not in self.check_ferias_ir_rubrica_code():
+                    contabilizacao_rubricas.append((0, 0, {
+                        'code': line.codigo_contabil,
+                        'valor': line.total,
+                        # opcional para historico padrao
+                        'name': line.salary_rule_id.name,
+                        'hr_payslip_line_id': [(4, line.id)],
+                    }))
+                if not somente_ir and not somente_inss:
+                    contabilizacao_rubricas.append((0, 0, {
+                        'code': line.codigo_contabil,
+                        'valor': line.total,
+                        # opcional para historico padrao
+                        'name': line.salary_rule_id.name,
+                        'hr_payslip_line_id': [(4, line.id)],
+                    }))
         return contabilizacao_rubricas
 
     @api.multi
