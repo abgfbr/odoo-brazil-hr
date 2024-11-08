@@ -98,9 +98,10 @@ class HrHolidays(models.Model):
 
     saldo_disponivel = fields.Float(
         string='Saldo de dias de férias',
-        related='parent_id.number_of_days_temp',
+        # related='parent_id.number_of_days_temp',
         help='Indica o total de dias que o funcionario poderá selecionar em '
              'sua programação de férias.',
+        compute='_compute_saldo_disponivel'
     )
     saldo_final = fields.Float(
         string='Saldo final de dias de férias',
@@ -150,6 +151,16 @@ class HrHolidays(models.Model):
     )
 
     @api.multi
+    def _compute_saldo_disponivel(self):
+        for holiday in self:
+            dias_gozados = 0
+            for ferias in holiday.parent_id.child_ids.sorted(lambda x: x.data_inicio):
+                if ferias.id == holiday.id:
+                    break
+                dias_gozados += ferias.vacations_days + ferias.sold_vacations_days
+            holiday.saldo_disponivel = holiday.parent_id.vacations_days - dias_gozados
+
+    @api.multi
     @api.depends('controle_ferias')
     def _compute_periodo_aquisitivo(self):
         for holiday in self:
@@ -164,7 +175,8 @@ class HrHolidays(models.Model):
         for holiday in self:
             if not holiday.parent_id:
                 continue
-            dias_de_direito = holiday.parent_id.number_of_days_temp
+            # dias_de_direito = holiday.parent_id.number_of_days_temp
+            dias_de_direito = holiday.saldo_disponivel
             dias_selecionados = holiday.number_of_days_temp
             holiday.saldo_final = dias_de_direito - dias_selecionados
             holiday.regular = False
