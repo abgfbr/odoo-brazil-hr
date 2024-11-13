@@ -73,7 +73,8 @@ class L10nBrHrPayslip(models.Model):
             '1/3_ABONO_PECUNIARIO',
             'BASE_IRPF',
             'IRPF_FERIAS',
-            'BASE_IRPF_PROPORCIONAL_FERIAS'
+            'BASE_IRPF_PROPORCIONAL_FERIAS',
+            'LIQUIDO_FERIAS',
         }
 
     def invert_rubrica_ferias_code_para_holerite(self, code):
@@ -84,6 +85,7 @@ class L10nBrHrPayslip(models.Model):
             '1/3_ABONO_PECUNIARIO': '1/3_ABONO_PECUNIARIO_FERIAS	',
             'BASE_IRPF': 'BASE_IRPF_PROPORCIONAL_FERIAS',
             'IRPF_FERIAS': 'IRPF_FERIAS_FERIAS',
+            'LIQUIDO_FERIAS': 'PAGAMENTO_FERIAS',
         }
 
         return inversoes.get(code, code)
