@@ -65,8 +65,8 @@ class L10nBrHrPayslip(models.Model):
 
         return result
 
-    def check_ferias_ir_rubrica_code(self):
-        return {
+    def check_ferias_ir_rubrica_code(self, excluir_inss=False):
+        rubricas = {
             'FERIAS',
             '1/3_FERIAS',
             'ABONO_PECUNIARIO',
@@ -77,6 +77,11 @@ class L10nBrHrPayslip(models.Model):
             'LIQUIDO_FERIAS',
         }
 
+        if not excluir_inss:
+            rubricas.update({'INSS'})
+
+        return rubricas
+
     def invert_rubrica_ferias_code_para_holerite(self, code):
         inversoes = {
             'FERIAS': 'FERIAS_FERIAS',
@@ -86,6 +91,7 @@ class L10nBrHrPayslip(models.Model):
             'BASE_IRPF': 'BASE_IRPF_PROPORCIONAL_FERIAS',
             'IRPF_FERIAS': 'IRPF_FERIAS_FERIAS',
             'LIQUIDO_FERIAS': 'PAGAMENTO_FERIAS',
+            'INSS': 'INSS_FERIAS_PAGO_MES_ANTERIOR',
         }
 
         return inversoes.get(code, code)
@@ -122,9 +128,10 @@ class L10nBrHrPayslip(models.Model):
                         'name': line.salary_rule_id.name,
                         'hr_payslip_line_id': [(4, line.id)],
                     }))
-                if somente_inss and line.salary_rule_id.code not in self.check_ferias_ir_rubrica_code():
+                if somente_inss and line.salary_rule_id.code not in self.check_ferias_ir_rubrica_code(excluir_inss=True):
+                    codigo_contabil = line.codigo_contabil if line.codigo_contabil not in ['INSS_COMPETENCIA_ATUAL_FERIAS', 'INSS_COMPETENCIA_SEGUINTE_FERIAS'] else 'INSS_FERIAS_PAGO_MES_ANTERIOR_PROVISIONADO'
                     contabilizacao_rubricas.append((0, 0, {
-                        'code': line.codigo_contabil,
+                        'code': codigo_contabil,
                         'valor': line.total,
                         # opcional para historico padrao
                         'name': line.salary_rule_id.name,
