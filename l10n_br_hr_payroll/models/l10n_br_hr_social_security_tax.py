@@ -118,7 +118,7 @@ class L10nBrHrSocialTax(models.Model):
 
                     # O INSS usa o truncamento de 2 casas decimais
                     agregado = \
-                        Decimal(agregado).quantize(Decimal('0.01'), ROUND_DOWN)
+                        Decimal(agregado).quantize(Decimal('0.01'))
                     inss += agregado
                     base_inss -= Decimal(faixa.max_wage - faixa.min_wage)
 
