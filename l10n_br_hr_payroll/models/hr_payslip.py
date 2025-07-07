@@ -850,16 +850,16 @@ class HrPayslip(models.Model):
                 if self.data_afastamento == primeiro_dia_do_mes[:10]:
                     dias_mes = 0
 
-                # Ajuste temporário!
-                # Se na rescisao ja tiver sido calculado o holerite do mes:
-                # Holerite março gerado em 17/mar referente a 1/mar ate 30/mar
-                # rescisao feita no dia 30/mar
-                # Zerar os dias do mes pois ja foram pagos no holerite
-                # Quando rescisao o metodo set_dates da payslip, encarega de
-                #  igualar o dat_from e date_to do holerite à data de afastam.
-                if self.data_afastamento == self.date_to and \
-                        self.data_afastamento == self.date_to:
-                    dias_mes = 0
+                # # Ajuste temporário!
+                # # Se na rescisao ja tiver sido calculado o holerite do mes:
+                # # Holerite março gerado em 17/mar referente a 1/mar ate 30/mar
+                # # rescisao feita no dia 30/mar
+                # # Zerar os dias do mes pois ja foram pagos no holerite
+                # # Quando rescisao o metodo set_dates da payslip, encarega de
+                # #  igualar o dat_from e date_to do holerite à data de afastam.
+                # if self.data_afastamento == self.date_to and \
+                #         self.data_afastamento == self.date_to:
+                #     dias_mes = 0
 
             result += [self.get_attendances(
                 u'Dias Base', 30, u'DIAS_BASE', dias_mes, 0.0, contract_id)]
@@ -1397,7 +1397,7 @@ class HrPayslip(models.Model):
             ('contract_id', '=', payslip.contract_id.id),
             ('state', 'in', ['done', 'verify']),
             ('is_simulacao', '=', False)
-        ])
+        ], limit=1)
         if holerite_ferias:
             lines = []
             for line in holerite_ferias.line_resume_ids:
