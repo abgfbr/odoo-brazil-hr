@@ -1385,26 +1385,76 @@ class HrPayslip(models.Model):
 
     @profile
     def buscar_ferias_do_mes(self, payslip):
+        class PayslipLineWrapper:
+            def __init__(self, data):
+                self.__dict__.update(data)
         """
         Buscar holerite de ferias que tem o inicio dentro do mes da competencia
         que esta sendo calculada. Isto é, quando estiver sendo calculado o
         holerite de OUTUBRO, buscar férias que tem a data inicial em OUT.
         """
-        holerite_ferias = self.search([
+        holerites_ferias = self.search([
             ('tipo_de_folha', '=', 'ferias'),
             ('date_from', '>=', payslip.date_from),
             ('date_from', '<=', payslip.date_to),
             ('contract_id', '=', payslip.contract_id.id),
             ('state', 'in', ['done', 'verify']),
             ('is_simulacao', '=', False)
-        ], limit=1)
-        if holerite_ferias:
+        ])
+        if holerites_ferias:
             lines = []
-            for line in holerite_ferias.line_resume_ids:
-                lines.append(line)
+            for ferias in holerites_ferias:
+                for line in ferias.line_resume_ids:
+                    if line.code in ['PAGAMENTO_ANTECIPADO_INSS_FERIAS', 'INSS_FERIAS_COMPETENCIA_ANTERIOR']:
+                        continue
+                    rubrica = None
+                    for r in lines:
+                        if r.salary_rule_id == line.salary_rule_id:
+                            rubrica = r
+                    if rubrica:
+                        rubrica.amount += line.amount
+                        rubrica.total += line.total
+                        if line.code == 'FERIAS':
+                            reference_line = line.reference.split(' ')
+                            reference_rubrica = rubrica.reference.split(' ')
+                            rubrica.reference = '{} dias'.format(int(reference_line[0]) + int(reference_rubrica[0]))
+                    else:
+                        amount = line.amount
+                        qty = line.quantity
+                        category_id = line.category_id
+                        name = line.name
+                        lines.append(PayslipLineWrapper({
+                            'salary_rule_id': line.salary_rule_id,
+                            'contract_id': payslip.contract_id,
+                            'name': name,
+                            'reference': line.reference,
+                            'code': line.code,
+                            'category_id': category_id,
+                            'sequence': line.sequence,
+                            'appears_on_payslip': line.appears_on_payslip,
+                            'condition_select': line.condition_select,
+                            'condition_python': line.condition_python,
+                            'condition_range': line.condition_range,
+                            'condition_range_min': line.condition_range_min,
+                            'condition_range_max': line.condition_range_max,
+                            'amount_select': line.amount_select,
+                            'amount_fix': line.amount_fix,
+                            'amount_python_compute':
+                                line.amount_python_compute,
+                            'amount_percentage': line.amount_percentage,
+                            'amount_percentage_base':
+                                line.amount_percentage_base,
+                            'register_id': line.register_id,
+                            'amount': amount,
+                            'employee_id': payslip.employee_id,
+                            'quantity': qty,
+                            'rate': line.rate,
+                            'partner_id': line.partner_id,
+                            'total': line.total
+                        }))
         else:
             return False, False
-        return lines, holerite_ferias.holidays_ferias
+        return lines, holerites_ferias[0].holidays_ferias
 
     @profile
     def get_specific_rubric_value(self, rubrica_id, references=False):
@@ -1988,22 +2038,30 @@ class HrPayslip(models.Model):
             ('date_from', '<=', data_final),
             ('is_simulacao', '=', False),
         ]
-        holerite_ferias_id = self.search(
-            domain, limit=1, order='date_from DESC')
+        holerite_ferias_ids = self.search(
+            domain, order='date_from DESC')
 
         # Se não localizar nenhuma férias retorna 0
-        if not holerite_ferias_id:
+        if not holerite_ferias_ids:
             return 0
 
         # Se o mes da referencia for o mesmo das ferias encontradas,
         # retornar a rubrica de INSS_COMPETENCIA_ATUAL
-        if holerite_ferias_id.mes_do_ano == reference_mes:
-            return holerite_ferias_id[0].line_ids.filtered(
-                lambda x: x.code == 'INSS_COMPETENCIA_ATUAL').total or 0.0
+        total_inss_competencia = 0
+        total_inss_competencia_seguinte = 0
+        for holerite_ferias_id in holerite_ferias_ids:
+            if holerite_ferias_id.mes_do_ano == reference_mes:
+                total_inss_competencia += holerite_ferias_id.line_ids.filtered(
+                    lambda x: x.code == 'INSS_COMPETENCIA_ATUAL').total
 
-        if holerite_ferias_id.mes_do_ano == (reference_mes - 1 if reference_mes > 1 else 12):
-            return holerite_ferias_id[0].line_ids.filtered(
-                lambda x: x.code == 'INSS_COMPETENCIA_SEGUINTE').total or 0.0
+            if holerite_ferias_id.mes_do_ano == (reference_mes - 1 if reference_mes > 1 else 12):
+                total_inss_competencia_seguinte += holerite_ferias_id.line_ids.filtered(
+                    lambda x: x.code == 'INSS_COMPETENCIA_SEGUINTE').total
+
+        if total_inss_competencia:
+            return total_inss_competencia
+        elif total_inss_competencia_seguinte:
+            return total_inss_competencia_seguinte
 
         return 0.0
 
@@ -2087,20 +2145,25 @@ class HrPayslip(models.Model):
 
         domain.append(('ano', 'in', anos))
 
-        holerite = self.search(domain, order='date_from DESC', limit=1)
+        if tipo_de_folha == 'ferias':
+            holerites = self.search(domain, order='date_from DESC')
+        else:
+            holerites = self.search(domain, order='date_from DESC', limit=1)
 
-        if holerite and self.tipo_de_folha in ['rescisao', 'decimo_terceiro']:
-            return sum(
-                holerite.line_ids.filtered(lambda x: x.code == code).mapped(
-                    'total')) or 0.0
+        for holerite in holerites:
+            if holerite and self.tipo_de_folha in ['rescisao', 'decimo_terceiro']:
+                return sum(
+                    holerite.line_ids.filtered(lambda x: x.code == code).mapped(
+                        'total')) or 0.0
 
         valores = 0
-        if holerite:
-            if (self.date_from <= holerite.date_from <= self.date_to or
-                    self.date_from <= holerite.date_to <= self.date_to):
-                for line in holerite.line_ids:
-                    if line.code == code:
-                        valores += line.total
+        for holerite in holerites:
+            if holerite:
+                if (self.date_from <= holerite.date_from <= self.date_to or
+                        self.date_from <= holerite.date_to <= self.date_to):
+                    for line in holerite.line_ids:
+                        if line.code == code:
+                            valores += line.total
 
         return valores
 
